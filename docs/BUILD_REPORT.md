@@ -13,6 +13,9 @@ Verification so far:
 - The combined chat and Git regression suite passed: seven tests in 48.84 seconds. FastAPI's inherited TestClient emits an httpx deprecation warning.
 - Full backend mypy passed for 259 source files. Focused bot Ruff checks passed.
 - The detached local server returned `{"status":"ok"}` from `/api/health` and binds to `127.0.0.1:8000`.
+- The final frontend build and focused ESLint passed. Browser review covered the bot library, conversation/settings navigation, saved model changes, connection failure reporting, and the mobile composer at 390 × 844 with no horizontal page overflow.
+- The Windows launcher uses a hidden WMI worker to detach the server from the launching tool session. The root-launched instance remained healthy across later build, Git, browser, and packaging commands.
+- The first GitHub workflow run passed. It checks the bot backend, all backend types, the focused regression suite, and frontend compilation.
 
 The inherited full Ruff check reports existing violations across the base application and tests. GitHub's default workflow explicitly checks the bot modules and focused regression tests, all backend types, and the frontend build. The inherited full test suite remains an optional manual run. No paid model request, real target-repository push/PR, OVH deployment, or sandboxed project command execution was performed.
 
