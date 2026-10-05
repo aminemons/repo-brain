@@ -7,10 +7,19 @@ from urllib.parse import urlparse
 
 from backend.app.config import get_settings
 from backend.app.services.language_detector import LanguageDetector
-from backend.app.services.repo_scanner.file_info import modified_at_iso, scan_file, scan_file_metadata
+from backend.app.services.project_policy import is_sensitive_path, validate_project_root
+from backend.app.services.repo_scanner.file_info import (
+    modified_at_iso,
+    scan_file,
+    scan_file_metadata,
+)
 from backend.app.services.repo_scanner.filesystem import FileSystemWalker
 from backend.app.services.repo_scanner.git_ops import GitOperations
-from backend.app.services.repo_scanner.models import RepoDescriptor, RepoFileScanResult, RepoScanResult
+from backend.app.services.repo_scanner.models import (
+    RepoDescriptor,
+    RepoFileScanResult,
+    RepoScanResult,
+)
 
 GIT_URL_SCHEMES = {"http", "https", "ssh", "git", "file"}
 SCP_LIKE_GIT_URL = re.compile(r"^[A-Za-z0-9_.-]+@[^:]+:.+")
@@ -37,6 +46,8 @@ class RepoScanner:
     def describe(self, path: str, *, name: str | None = None, source_type: str = "local") -> RepoDescriptor:
         requested_path = path.strip()
         if is_git_url(requested_path):
+            if get_settings().project_root is not None:
+                raise ValueError("Register the configured local project root; remote clones are disabled.")
             repo_path = self._ensure_git_clone(requested_path)
             source_type = "git"
             default_name = repo_name_from_git_url(requested_path)
@@ -47,6 +58,7 @@ class RepoScanner:
             raise FileNotFoundError(f"Repository path does not exist: {repo_path}")
         if not repo_path.is_dir():
             raise NotADirectoryError(f"Repository path is not a directory: {repo_path}")
+        repo_path = validate_project_root(repo_path)
         git_url, commit_hash = self.git.metadata(repo_path)
         return RepoDescriptor(
             id=hashlib.sha1(str(repo_path).encode("utf-8")).hexdigest()[:16],
@@ -135,7 +147,11 @@ class RepoScanner:
                 except OSError:
                     skipped_count += 1
                     continue
-                if not file_path.is_file() or stat.st_size > self.max_file_size_bytes:
+                if (
+                    file_path.is_symlink() or not file_path.resolve().is_relative_to(root)
+                    or is_sensitive_path(relative_path) or not file_path.is_file()
+                    or stat.st_size > self.max_file_size_bytes
+                ):
                     skipped_count += 1
                     continue
                 file_paths.append(file_path)

@@ -30,7 +30,7 @@ COPY backend ./backend
 COPY --from=frontend-builder /app/backend/app/static ./backend/app/static
 
 RUN pip install --upgrade pip \
-    && pip wheel --wheel-dir /wheels .
+    && pip wheel --wheel-dir /wheels ".[docs]"
 
 FROM ${PYTHON_IMAGE} AS runtime-base
 
@@ -41,6 +41,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
+    HOME=/tmp \
+    XDG_CACHE_HOME=/tmp/cache \
+    LITELLM_LOCAL_MODEL_COST_MAP=true \
     CODEWIKI_DATABASE_URL=sqlite+aiosqlite:////app/data/codewiki.sqlite3 \
     CODEWIKI_STORAGE_DIR=/app/storage
 
@@ -64,10 +67,15 @@ FROM runtime-base AS runtime
 WORKDIR /app
 
 COPY --from=python-builder /wheels /wheels
-RUN pip install --no-index --find-links=/wheels codewiki \
+RUN pip install --no-index --find-links=/wheels 'codewiki[docs]' \
     && rm -rf /wheels
 
-RUN mkdir -p /app/data /app/storage /workspace
+RUN groupadd --gid 10001 projectbrain \
+    && useradd --uid 10001 --gid projectbrain --no-create-home --shell /usr/sbin/nologin projectbrain \
+    && mkdir -p /app/data /app/storage /workspace \
+    && chown -R projectbrain:projectbrain /app/data /app/storage /workspace
+
+USER 10001:10001
 
 EXPOSE 8000
 

@@ -3,10 +3,12 @@ from hashlib import sha256
 
 from backend.app.database import CodeWikiStore
 from backend.app.schemas.ask import AskRequest, AskResponse, SourceRef
+from backend.app.services.async_tasks import run_blocking
 from backend.app.services.graphrag import GraphRAGRetriever
 from backend.app.services.llm.gateway import LLMGateway
 from backend.app.services.llm.messages import dynamic_json_message, stable_json_message
 from backend.app.services.llm.operations import CachedLLMService, LLMOperation
+from backend.app.services.project_brain.service import ProjectBrainService
 from backend.app.services.prompts import load_prompt
 
 
@@ -18,6 +20,7 @@ class QAPromptContext:
     related_nodes: list[dict[str, object]]
     related_edges: list[dict[str, object]]
     community_summaries: list[dict[str, object]]
+    documentation_evidence: str
 
 
 class QuestionAnswerer:
@@ -48,6 +51,11 @@ class QuestionAnswerer:
         related_edges = trace.related_edges if request.include_graph else []
         related_communities = trace.community_summaries if request.include_graph else []
         sources = _source_refs(trace.source_chunks) if request.include_sources else []
+        brain = await run_blocking(ProjectBrainService, self.store, self.retriever.settings)
+        documentation = await run_blocking(brain.search_documents, repo_id, request.question, 8)
+        documentation_evidence = await run_blocking(
+            brain.document_evidence, repo_id, request.question, result=documentation,
+        )
         prompt_context = QAPromptContext(
             question=request.question,
             context_pack=trace.context_pack,
@@ -55,6 +63,7 @@ class QuestionAnswerer:
             related_nodes=related_nodes,
             related_edges=related_edges,
             community_summaries=related_communities,
+            documentation_evidence=documentation_evidence,
         )
         completion = await self.llm_service.complete(
             repo_id,
@@ -66,8 +75,9 @@ class QuestionAnswerer:
                         "Stable QA contract",
                         {
                             "instructions": (
-                                "Use only this GraphRAG context. Cite files and lines from "
-                                "sources when making code claims."
+                                "Use the code and documentation evidence provided. Cite files "
+                                "and lines for code claims and [doc:<section_id>] for manual "
+                                "claims. Distinguish intended behavior from implementation."
                             )
                         },
                     ),
@@ -88,6 +98,9 @@ class QuestionAnswerer:
             related_edges=related_edges,
             related_communities=related_communities,
             trace_id=trace.trace_id,
+            documentation_sources=(
+                [section.source for section in documentation.results] if request.include_sources else []
+            ),
         )
 
 def _source_refs(chunks: list[dict[str, object]]) -> list[SourceRef]:

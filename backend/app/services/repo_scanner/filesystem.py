@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from backend.app.services.project_policy import is_sensitive_path, validate_project_root
 from backend.app.services.repo_scanner.file_info import is_probably_binary
 from backend.app.services.repo_scanner.ignore import IgnoreMatcher
 
@@ -19,6 +20,7 @@ class FileSystemWalker:
         self.detect_binary = detect_binary
 
     def walk(self, root: Path) -> FileSystemWalkResult:
+        root = validate_project_root(root)
         matcher = IgnoreMatcher(root)
         file_paths: list[Path] = []
         ignored_count = 0
@@ -36,7 +38,11 @@ class FileSystemWalker:
             kept_dirs: list[str] = []
             for dir_name in dir_names:
                 dir_path = current_path / dir_name
-                if dir_path.is_symlink() or matcher.is_ignored(dir_path, is_dir=True):
+                if (
+                    dir_path.is_symlink() or not dir_path.resolve().is_relative_to(root)
+                    or is_sensitive_path(dir_path.relative_to(root))
+                    or matcher.is_ignored(dir_path, is_dir=True)
+                ):
                     ignored_count += 1
                     continue
                 kept_dirs.append(dir_name)
@@ -44,7 +50,11 @@ class FileSystemWalker:
 
             for file_name in file_names:
                 file_path = current_path / file_name
-                if file_path.is_symlink() or matcher.is_ignored(file_path, is_dir=False):
+                if (
+                    file_path.is_symlink() or not file_path.resolve().is_relative_to(root)
+                    or is_sensitive_path(file_path.relative_to(root))
+                    or matcher.is_ignored(file_path, is_dir=False)
+                ):
                     ignored_count += 1
                     continue
                 if not file_path.is_file():

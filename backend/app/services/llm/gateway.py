@@ -4,6 +4,8 @@ from typing import Any
 
 from backend.app.config import Settings
 from backend.app.services.llm.model_router import ModelRouter
+from backend.app.services.llm.privacy import prepare_embeddings, prepare_messages
+from backend.app.services.project_policy import validate_model_destination
 
 
 @dataclass(frozen=True)
@@ -37,12 +39,17 @@ class LLMGateway:
         response_format: str | None = None,
         provider_user_id: str | None = None,
     ) -> LLMResult:
-        from litellm import acompletion
-
         profile = self.router.profile_for(task_type)
+        validate_model_destination(
+            self.settings, model=profile.model, endpoint=profile.endpoint,
+            provider_type=profile.provider_type,
+        )
+        from litellm import acompletion
         kwargs: dict[str, Any] = {
             "model": _litellm_model(profile),
-            "messages": messages,
+            "messages": prepare_messages(
+                self.settings, messages, model=profile.model, endpoint=profile.endpoint,
+            ),
             "temperature": profile.temperature,
             "timeout": self.settings.llm.timeout_seconds,
             "num_retries": max(0, self.settings.llm.max_retries),
@@ -77,12 +84,17 @@ class LLMGateway:
         )
 
     async def stream(self, task_type: str, messages: list[dict[str, str]]) -> AsyncIterator[LLMDelta]:
-        from litellm import acompletion
-
         profile = self.router.profile_for(task_type)
+        validate_model_destination(
+            self.settings, model=profile.model, endpoint=profile.endpoint,
+            provider_type=profile.provider_type,
+        )
+        from litellm import acompletion
         kwargs: dict[str, Any] = {
             "model": _litellm_model(profile),
-            "messages": messages,
+            "messages": prepare_messages(
+                self.settings, messages, model=profile.model, endpoint=profile.endpoint,
+            ),
             "temperature": profile.temperature,
             "stream": True,
             "timeout": self.settings.llm.timeout_seconds,
@@ -100,12 +112,15 @@ class LLMGateway:
                 yield LLMDelta(content=content)
 
     async def embed(self, texts: list[str], *, task_type: str = "embedding") -> list[list[float]]:
-        from litellm import aembedding
-
         profile = self.router.profile_for(task_type)
+        validate_model_destination(
+            self.settings, model=profile.model, endpoint=profile.endpoint,
+            provider_type=profile.provider_type,
+        )
+        from litellm import aembedding
         kwargs: dict[str, Any] = {
             "model": _litellm_model(profile),
-            "input": texts,
+            "input": prepare_embeddings(self.settings, texts, endpoint=profile.endpoint),
             "num_retries": max(0, self.settings.llm.max_retries),
         }
         if profile.endpoint:

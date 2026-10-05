@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from typing import Any, cast
 
 import click
@@ -11,7 +12,12 @@ from backend.app.services.analyzer import AnalysisService
 from backend.app.services.graph.query import GraphQueryService
 from backend.app.services.incremental import IncrementalUpdater
 from backend.app.services.incremental.watcher import IncrementalUpdateWatcher, WatchIterationResult
-from backend.app.services.lite import create_lite_store, init_lite_repo, lite_database_path, uninit_lite_repo
+from backend.app.services.lite import (
+    create_lite_store,
+    init_lite_repo,
+    lite_database_path,
+    uninit_lite_repo,
+)
 from backend.app.services.lite_agents import (
     AgentInstallResult,
     AgentTarget,
@@ -259,7 +265,7 @@ def register(main: click.Group) -> None:
     @click.option("--json", "as_json", is_flag=True, help="Print JSON output.")
     def status(path: str, as_json: bool) -> None:
         """Show lightweight index statistics."""
-        store, repo, payload = _lite_status(path)
+        store, _repo, payload = _lite_status(path)
         store.close()
         if as_json:
             echo_json(payload)
@@ -453,7 +459,7 @@ def register(main: click.Group) -> None:
         changed_files = list(files)
         if use_stdin:
             changed_files.extend(
-                line.strip() for line in click.get_text_stream("stdin").read().splitlines() if line.strip()
+                line.strip() for line in sys.stdin.read().splitlines() if line.strip()
             )
         store, repo = _lite_repo(repo_path)
         result = run_click_errors(

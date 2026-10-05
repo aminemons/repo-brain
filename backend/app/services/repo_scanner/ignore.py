@@ -3,7 +3,6 @@ from pathlib import Path
 
 from pathspec.patterns.gitignore.spec import GitIgnoreSpecPattern
 
-
 DEFAULT_IGNORE_PATTERNS = [
     ".git/",
     ".codewiki/",
@@ -66,7 +65,10 @@ class IgnoreMatcher:
 
     def add_gitignore(self, directory: Path) -> None:
         gitignore_path = directory / ".gitignore"
-        if not gitignore_path.is_file():
+        if (
+            gitignore_path.is_symlink() or not gitignore_path.resolve().is_relative_to(self.root)
+            or not gitignore_path.is_file()
+        ):
             return
         self.add_lines(directory, gitignore_path.read_text(encoding="utf-8", errors="replace").splitlines())
 

@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import PurePosixPath
 
+from backend.app.services.artifact_roles import artifact_kind
 from backend.app.services.ast_parser import AstSymbol
 from backend.app.services.graph.ids import directory_node_id, module_node_id
 from backend.app.services.graph.models import CodeGraphNode
@@ -32,6 +33,7 @@ def file_node(
         "is_source": scanned_file.is_source,
         "size_bytes": scanned_file.size_bytes,
         "modified_at": scanned_file.modified_at,
+        "artifact_kind": artifact_kind(scanned_file.path),
     }
     metadata.update(extra_metadata or {})
     if scanned_file.last_commit_at is not None:

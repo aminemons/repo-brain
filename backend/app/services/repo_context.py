@@ -1,6 +1,11 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from backend.app.services.project_policy import (
+    confined_repo_file,
+    is_sensitive_path,
+    validate_project_root,
+)
 
 DEFAULT_EXCLUDED_DIRS = {
     ".git",
@@ -75,7 +80,7 @@ class RepositoryContextBuilder:
         self.max_entries_per_dir = max_entries_per_dir
 
     def build(self, repo_path: str) -> RepositoryContext:
-        root = Path(repo_path).resolve()
+        root = validate_project_root(repo_path)
         return RepositoryContext(
             project_type=_detect_project_type(root),
             directory_tree=self._directory_tree(root),
@@ -98,6 +103,7 @@ class RepositoryContextBuilder:
                     entry
                     for entry in directory.iterdir()
                     if not entry.name.startswith(".") and entry.name not in DEFAULT_EXCLUDED_DIRS
+                    and not entry.is_symlink() and not is_sensitive_path(entry.name)
                 ],
                 key=lambda entry: (entry.is_file(), entry.name.lower()),
             )[: self.max_entries_per_dir]
@@ -116,6 +122,10 @@ class RepositoryContextBuilder:
             path = root / name
             if not path.is_file():
                 continue
+            try:
+                path = confined_repo_file(root, name)
+            except ValueError:
+                continue
             content = path.read_text(encoding="utf-8", errors="replace").strip()
             if len(content) > self.max_readme_chars:
                 return content[: self.max_readme_chars].rstrip() + "\n\n[README truncated]"
@@ -130,7 +140,8 @@ def _detect_project_type(root: Path) -> str:
     package_files = [
         path
         for path in root.glob("**/package.json")
-        if not _is_in_excluded_dir(path.relative_to(root))
+        if not path.is_symlink() and path.resolve().is_relative_to(root)
+        and not _is_in_excluded_dir(path.relative_to(root)) and path.stat().st_size <= 2_000_000
     ][:5]
     if package_files:
         package_text = "\n".join(

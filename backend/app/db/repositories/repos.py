@@ -1,15 +1,15 @@
 from sqlalchemy import delete, select, text
 
+from backend.app.db.repositories.base import RepositorySupportMixin
 from backend.app.db.utils import now_iso
 from backend.app.models import RepoRecord
+from backend.app.services.project_policy import validate_project_root
 from backend.app.services.repo_scanner import RepoDescriptor
-
-
-from backend.app.db.repositories.base import RepositorySupportMixin
 
 
 class RepoRepositoryMixin(RepositorySupportMixin):
     def upsert_repo(self, repo: RepoDescriptor) -> RepoDescriptor:
+        validate_project_root(repo.path)
         now = now_iso()
         with self.orm_session() as session:
             record = session.get(RepoRecord, repo.id)
@@ -67,6 +67,7 @@ class RepoRepositoryMixin(RepositorySupportMixin):
 
 
 def _repo_descriptor(record: RepoRecord) -> RepoDescriptor:
+    validate_project_root(record.path)
     return RepoDescriptor(
         id=record.id,
         name=record.name,

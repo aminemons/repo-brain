@@ -1,0 +1,34 @@
+# Maintainer-authored benchmark template. Do not populate with invented project
+# questions or expected facts. `expected_evidence` should identify verifiable
+# source entities/sections after the target repository and manual are available.
+schema_version: 1
+project_snapshot:
+  repository_commit: null
+  documentation_versions: []
+  benchmark_owner: null
+  last_reviewed: null
+categories:
+  - location
+  - architecture
+  - execution_trace
+  - business_term
+  - code_document_conflict
+  - git_history
+  - impact
+  - onboarding
+  - bug_root_cause
+cases: []
+
+# Case shape:
+# - id: location-001
+#   category: location
+#   question: <maintainer-authored question>
+#   expected_evidence:
+#     - source_type: code | test | documentation | git | config
+#       locator: <symbol/path/section/commit>
+#       claim_supported: <what this evidence should establish>
+#   expected_conflicts: []
+#   acceptable_claim_statuses: [VERIFIED_CODE, DOCUMENTED]
+#   prohibited_claims: []
+#   reviewer: <maintainer>
+#   review_status: draft | approved

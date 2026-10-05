@@ -1,8 +1,15 @@
 import asyncio
+import sys
 
 import click
 
-from backend.app.cli.common import echo_json, page_result_payload, resolve_repo, run_click_errors, store_from_context
+from backend.app.cli.common import (
+    echo_json,
+    page_result_payload,
+    resolve_repo,
+    run_click_errors,
+    store_from_context,
+)
 from backend.app.cli.services import wiki_generator
 
 
@@ -188,7 +195,7 @@ def register(main: click.Group) -> None:
         """Save agent-written Markdown for one wiki page."""
         if not from_stdin:
             raise click.ClickException("Use --stdin to provide Markdown content.")
-        markdown = click.get_text_stream("stdin").read()
+        markdown = sys.stdin.read()
         store = store_from_context(ctx)
         selected_repo = run_click_errors(lambda: resolve_repo(store, repo_option or repo))
         payload = run_click_errors(

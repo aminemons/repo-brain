@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+deploy/project-brain.env
 
 __pycache__/
 *.py[cod]

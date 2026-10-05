@@ -1,5 +1,7 @@
-import click
+import sys
 from typing import cast
+
+import click
 
 from backend.app.cli.common import (
     echo_json,
@@ -181,7 +183,7 @@ def register(main: click.Group) -> None:
         changed_files = list(files)
         if use_stdin:
             changed_files.extend(
-                line.strip() for line in click.get_text_stream("stdin").read().splitlines() if line.strip()
+                line.strip() for line in sys.stdin.read().splitlines() if line.strip()
             )
         result = run_click_errors(
             lambda: GraphQueryService(store=store).affected(

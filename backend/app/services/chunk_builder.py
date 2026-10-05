@@ -6,6 +6,7 @@ from backend.app.services.file_roles import is_wiki_noise_file
 from backend.app.services.graph import CodeGraphNode
 from backend.app.services.graphrag.constants import SOURCE_NODE_TYPES
 from backend.app.services.graphrag.utils import estimate_tokens, stable_id
+from backend.app.services.project_brain.sources import redact_source_text
 from backend.app.services.source_file_cache import SourceFileContentProvider
 
 CHUNK_SOURCE_NODE_TYPES = SOURCE_NODE_TYPES - {"file"}
@@ -27,7 +28,10 @@ class ChunkBuilder:
         seen: set[tuple[str, int, int, str]] = set()
 
         for node in sorted(nodes, key=lambda item: item.type == "file"):
-            if node.type not in CHUNK_SOURCE_NODE_TYPES or not node.file_path:
+            artifact_file = node.type == "file" and node.metadata.get("artifact_kind") in {
+                "build", "deployment", "ci", "schema", "configuration", "test",
+            }
+            if (node.type not in CHUNK_SOURCE_NODE_TYPES and not artifact_file) or not node.file_path:
                 continue
             if is_wiki_noise_file(node.file_path):
                 continue
@@ -43,32 +47,29 @@ class ChunkBuilder:
                 continue
 
             start_line = node.start_line or 1
-            end_line = node.end_line or start_line
+            end_line = node.end_line or (len(lines) if artifact_file or node.type == "config" else start_line)
             start_line = max(1, min(start_line, len(lines)))
             end_line = max(start_line, min(end_line, len(lines)))
-            content = "\n".join(lines[start_line - 1 : end_line])
-            if not content.strip():
-                continue
-            content = f"{content}\n"
-            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
-            dedupe_key = (node.file_path, start_line, end_line, content_hash)
-            if dedupe_key in seen:
-                continue
-            seen.add(dedupe_key)
-            chunk_id = source_chunk_id(repo_id, node.id, node.file_path, start_line, end_line, content_hash)
-            chunks.append(
-                CodeChunkRecord(
-                    id=chunk_id,
-                    repo_id=repo_id,
-                    node_id=node.id,
-                    file_path=node.file_path,
-                    start_line=start_line,
-                    end_line=end_line,
-                    content=content,
-                    content_hash=content_hash,
-                    token_count=estimate_tokens(content),
+            for chunk_start in range(start_line, end_line + 1, 80):
+                chunk_end = min(end_line, chunk_start + 79)
+                content = redact_source_text("\n".join(lines[chunk_start - 1 : chunk_end]))
+                if not content.strip() or len(content) > 30000:
+                    continue
+                content = f"{content}\n"
+                content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+                dedupe_key = (node.file_path, chunk_start, chunk_end, content_hash)
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                chunk_id = source_chunk_id(repo_id, node.id, node.file_path, chunk_start, chunk_end, content_hash)
+                chunks.append(
+                    CodeChunkRecord(
+                        id=chunk_id, repo_id=repo_id, node_id=node.id,
+                        file_path=node.file_path, start_line=chunk_start, end_line=chunk_end,
+                        content=content, content_hash=content_hash,
+                        token_count=estimate_tokens(content),
+                    )
                 )
-            )
         return sorted(chunks, key=lambda chunk: (chunk.file_path, chunk.start_line, chunk.end_line))
 
 

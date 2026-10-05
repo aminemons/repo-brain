@@ -1,7 +1,8 @@
 import re
-from pathlib import Path
 from typing import Any, TypedDict
 
+from backend.app.services.project_brain.sources import redact_source_text
+from backend.app.services.project_policy import confined_repo_file, validate_project_root
 from backend.app.services.wiki.sources.urls import _source_ref_href, _source_ref_label, _source_url
 
 CITATION_MARKER_RE = re.compile(r"\[\[(S\d+)\]\]")
@@ -42,7 +43,7 @@ def _validate_source_refs(
     if not isinstance(requested_refs, list):
         return [], ["source_refs must be an array."]
 
-    repo_root = Path(repo_path).resolve()
+    repo_root = validate_project_root(repo_path)
     chunk_ranges = _chunk_ranges(source_chunks)
     allowed_by_citation_id = _allowed_refs_by_citation_id(allowed_source_refs)
     valid_refs: list[dict[str, Any]] = []
@@ -73,8 +74,9 @@ def _validate_source_refs(
             errors.append(f"source_refs[{index}] has invalid line range.")
             continue
 
-        absolute_path = (repo_root / file_path).resolve()
-        if not absolute_path.is_file() or not absolute_path.is_relative_to(repo_root):
+        try:
+            absolute_path = confined_repo_file(repo_root, file_path)
+        except ValueError:
             errors.append(f"source_refs[{index}] file does not exist in repo: {file_path}.")
             continue
 
@@ -83,7 +85,7 @@ def _validate_source_refs(
             errors.append(f"source_refs[{index}] line range exceeds file length: {file_path}.")
             continue
 
-        content = "\n".join(lines[start_line - 1 : end_line])
+        content = redact_source_text("\n".join(lines[start_line - 1 : end_line]))
         matching_chunk = next(
             (
                 chunk

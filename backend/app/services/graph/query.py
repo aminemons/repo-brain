@@ -235,7 +235,7 @@ class GraphQueryService:
         limit: int = 20,
     ) -> GraphNodeContextResult:
         repo = self._require_repo(repo_id)
-        nodes, edges = self._graph(repo_id)
+        nodes, _edges = self._graph(repo_id)
         matches = self._symbol_matches(repo_id, symbol, nodes)
         if not matches:
             raise ValueError(f"Node not found: {symbol}")
@@ -581,10 +581,15 @@ def _read_node_sections(
     file_path: str,
     nodes: list[CodeGraphNode],
 ) -> list[ExploreFileSection]:
-    absolute = (root / file_path).resolve()
-    if not absolute.is_file() or not absolute.is_relative_to(root):
+    from backend.app.services.project_policy import confined_repo_file
+
+    try:
+        absolute = confined_repo_file(root, file_path)
+    except ValueError:
         return []
-    lines = absolute.read_text(encoding="utf-8", errors="replace").splitlines()
+    from backend.app.services.project_brain.sources import redact_source_text
+
+    lines = redact_source_text(absolute.read_text(encoding="utf-8", errors="replace")).splitlines()
     if not lines:
         return []
     ranges: list[tuple[int, int, str]] = []

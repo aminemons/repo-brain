@@ -1,0 +1,116 @@
+name: project-brain
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to a tested, pinned PostgreSQL/pgvector image tag}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-project_brain}
+      POSTGRES_USER: ${POSTGRES_USER:-project_brain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private deployment env file}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  codewiki:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: project-brain:local
+    environment:
+      CODEWIKI_APP_NAME: Project Brain
+      CODEWIKI_AUTH_TOKEN: ${CODEWIKI_AUTH_TOKEN:?Set CODEWIKI_AUTH_TOKEN in the private deployment env file}
+      CODEWIKI_VIEWER_TOKEN: ${CODEWIKI_VIEWER_TOKEN:-}
+      CODEWIKI_PROJECT_ROOT: /workspace/project
+      CODEWIKI_DOCUMENTATION_ROOT: ${CODEWIKI_DOCUMENTATION_ROOT:-/workspace/documentation}
+      CODEWIKI_LOCAL_ONLY: ${CODEWIKI_LOCAL_ONLY:-true}
+      CODEWIKI_PRIVACY_MODE: ${CODEWIKI_PRIVACY_MODE:-local_only}
+      CODEWIKI_EXTERNAL_EXCERPT_MAX_CHARS: ${CODEWIKI_EXTERNAL_EXCERPT_MAX_CHARS:-16000}
+      CODEWIKI_LOCAL_LLM_HOSTS: ${CODEWIKI_LOCAL_LLM_HOSTS:-localhost,127.0.0.1,::1,ollama,vllm,litellm}
+      CODEWIKI_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-project_brain}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the private deployment env file}@postgres:5432/${POSTGRES_DB:-project_brain}
+      CODEWIKI_STORAGE_DIR: /app/storage
+      CODEWIKI_LLM__DEFAULT__MODEL: ${CODEWIKI_LLM__DEFAULT__MODEL:-}
+      CODEWIKI_LLM__DEFAULT__PROVIDER_TYPE: ${CODEWIKI_LLM__DEFAULT__PROVIDER_TYPE:-}
+      CODEWIKI_LLM__DEFAULT__ENDPOINT: ${CODEWIKI_LLM__DEFAULT__ENDPOINT:-}
+      CODEWIKI_LLM__DEFAULT__API_KEY: ${CODEWIKI_LLM__DEFAULT__API_KEY:-}
+      CODEWIKI_LLM__TIMEOUT_SECONDS: ${CODEWIKI_LLM__TIMEOUT_SECONDS:-120}
+      CODEWIKI_LLM__MAX_RETRIES: ${CODEWIKI_LLM__MAX_RETRIES:-2}
+      CODEWIKI_LLM__CACHE_ENABLED: ${CODEWIKI_LLM__CACHE_ENABLED:-true}
+    volumes:
+      - project-storage:/app/storage
+      - ${PROJECT_REPO_PATH:?Set PROJECT_REPO_PATH to the target repository path}:/workspace/project:ro
+      - ${DOCUMENTATION_PATH:-${PROJECT_REPO_PATH}/docs}:/workspace/documentation:ro
+    expose:
+      - "8000"
+    networks:
+      - proxy
+      - data
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  caddy:
+    image: ${CADDY_IMAGE:?Set CADDY_IMAGE to a tested, pinned Caddy image tag}
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN to a DNS name pointed at this host}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+      - proxy
+    depends_on:
+      codewiki:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    image: ${OLLAMA_IMAGE:?Set OLLAMA_IMAGE to a tested, pinned Ollama image tag}
+    profiles: ["ollama"]
+    volumes:
+      - ollama-models:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - data
+    restart: unless-stopped
+
+networks:
+  edge:
+  proxy:
+    internal: true
+  data:
+    internal: true
+
+volumes:
+  postgres-data:
+  project-storage:
+  caddy-data:
+  caddy-config:
+  ollama-models:
