@@ -57,22 +57,13 @@
 }
 
 @media (max-width: 900px) {
-  .app-header,
   .graph-toolbar {
     align-items: stretch;
     grid-template-columns: 1fr;
   }
 
-  .app-header {
-    flex-wrap: wrap;
-  }
-
   .brand-block {
     min-width: 0;
-  }
-
-  .runtime-status {
-    margin-left: auto;
   }
 
   .graph-workspace {
@@ -114,20 +105,6 @@
 }
 
 @media (max-width: 640px) {
-  .app-header {
-    padding: 12px;
-  }
-
-  .top-nav {
-    order: 3;
-    width: 100%;
-  }
-
-  .top-nav a {
-    flex: 1;
-    justify-content: center;
-  }
-
   .assistant-rail {
     grid-template-columns: 1fr;
   }
