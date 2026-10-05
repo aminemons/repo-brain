@@ -337,7 +337,7 @@ function ChatPanel({
         </div>
       </div>
       {bot.instructions ? <details className="bot-instructions"><summary>Bot instructions</summary><p>{bot.instructions}</p></details> : null}
-      {!hasRefreshed && !detail?.messages.length ? <div className="bot-refresh-hint"><RefreshCw size={14} /><span>Refresh knowledge before your first conversation to index this repository's code and documentation.</span></div> : null}
+      {!hasRefreshed && !detail?.messages.length ? <div className="bot-refresh-hint"><RefreshCw size={14} /><span>Your first message prepares the repository index. Use Refresh knowledge after local changes.</span></div> : null}
       <div className="bot-messages" aria-live="polite">
         {conversationLoading ? <div className="bot-chat-empty">Loading conversation…</div> : null}
         {!conversationLoading && !detail ? <div className="bot-chat-empty"><MessageSquareText size={22} /><strong>Start a conversation</strong><span>Ask about this project, or switch to Teach to explore the code step by step.</span></div> : null}
