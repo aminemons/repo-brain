@@ -22,7 +22,7 @@ To keep the app running after closing the terminal:
 .\scripts\start-project-brain.ps1 -Background
 ```
 
-The launcher waits for a healthy API and writes its PID and logs to `.run/`.
+The launcher starts a hidden Windows task named `RepoBrain-Local-8000`, waits for a healthy API, and writes its PID and logs to `.run/`. The task starts manually and has no recurring schedule. To stop it, run `Stop-ScheduledTask -TaskName RepoBrain-Local-8000`.
 
 Manual setup works on other platforms:
 

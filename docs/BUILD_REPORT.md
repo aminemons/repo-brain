@@ -2,6 +2,8 @@
 
 ## Chat and Git fixes — 2026-10-05
 
+Follow-up: the WMI-launched server also disappeared after the chat turn ended. Background startup now uses Windows Task Scheduler with an interactive, non-elevated principal and no triggers. The API health check and browser bot library loaded successfully after that change. The earlier cross-command check did not establish survival beyond the chat turn.
+
 The local API had stopped. A bot package export also prevented startup after the latest edits. The chat API now indexes a fresh repository before retrieval and returns useful provider errors without exposing request credentials. The background PowerShell launcher was exercised successfully against the local API.
 
 Integration tests found an empty worktree index during change application. Seeding it with the base commit now preserves untouched tracked files. The regression tests cover that behavior, optimistic checks, documentation completion after merge, deduplication and batching, commit detection, and a stubbed publication path.
