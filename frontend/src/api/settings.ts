@@ -1,7 +1,7 @@
-import { API_BASE, readJson } from "./http";
+import { API_BASE, apiFetch, readJson } from "./http";
 import type { LlmModelsResponse } from "./types";
 
 export async function getLlmModels(): Promise<LlmModelsResponse> {
-  const response = await fetch(`${API_BASE}/settings/llm/models`);
+  const response = await apiFetch(`${API_BASE}/settings/llm/models`);
   return readJson(response, "LLM settings");
 }

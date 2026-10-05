@@ -1,11 +1,11 @@
-import { API_BASE, readJson } from "./http";
+import { API_BASE, apiFetch, readJson } from "./http";
 import type { AnalysisRunResponse, IncrementalUpdateResponse } from "./types";
 
 export async function analyzeRepo(
   repoId: string,
   payload: { name_communities?: boolean } = {}
 ): Promise<AnalysisRunResponse> {
-  const response = await fetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/analyze`, {
+  const response = await apiFetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -14,7 +14,7 @@ export async function analyzeRepo(
 }
 
 export async function getAnalysisRun(repoId: string, runId: string): Promise<AnalysisRunResponse> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/repos/${encodeURIComponent(repoId)}/runs/${encodeURIComponent(runId)}`
   );
   return readJson(response, "Analysis run");
@@ -28,7 +28,7 @@ export async function updateRepo(
     regenerate_wiki?: boolean;
   } = {}
 ): Promise<IncrementalUpdateResponse> {
-  const response = await fetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/update`, {
+  const response = await apiFetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/update`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)

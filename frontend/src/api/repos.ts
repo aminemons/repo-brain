@@ -1,4 +1,4 @@
-import { API_BASE, readJson } from "./http";
+import { API_BASE, apiFetch, readJson } from "./http";
 import type { RepoSummary } from "./types";
 
 export type CreateRepoPayload = {
@@ -8,17 +8,17 @@ export type CreateRepoPayload = {
 };
 
 export async function getHealth(): Promise<{ status: string }> {
-  const response = await fetch(`${API_BASE}/health`);
+  const response = await apiFetch(`${API_BASE}/health`);
   return readJson(response, "Health check");
 }
 
-export async function getRepos(): Promise<RepoSummary[]> {
-  const response = await fetch(`${API_BASE}/repos`);
+export async function getRepos(signal?: AbortSignal): Promise<RepoSummary[]> {
+  const response = await apiFetch(`${API_BASE}/repos`, { signal });
   return readJson(response, "Repository list");
 }
 
 export async function createRepo(payload: CreateRepoPayload): Promise<RepoSummary> {
-  const response = await fetch(`${API_BASE}/repos`, {
+  const response = await apiFetch(`${API_BASE}/repos`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -27,7 +27,7 @@ export async function createRepo(payload: CreateRepoPayload): Promise<RepoSummar
 }
 
 export async function deleteRepo(repoId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}`, {
+  const response = await apiFetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}`, {
     method: "DELETE"
   });
   if (!response.ok) {

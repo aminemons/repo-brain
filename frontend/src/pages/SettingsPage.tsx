@@ -1,6 +1,7 @@
-import { RefreshCw, ServerCog } from "lucide-react";
-import { useEffect, useState } from "react";
+import { KeyRound, RefreshCw, ServerCog } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 
+import { readAccessToken, saveAccessToken } from "../api/auth";
 import { getHealth } from "../api/repos";
 import { getLlmModels } from "../api/settings";
 import type { LlmModelsResponse } from "../api/types";
@@ -21,6 +22,7 @@ export function SettingsPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [accessToken, setAccessToken] = useState(readAccessToken);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +51,12 @@ export function SettingsPage({
       cancelled = true;
     };
   }, [reloadToken]);
+
+  const updateToken = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    saveAccessToken(accessToken);
+    setReloadToken((value) => value + 1);
+  };
 
   return (
     <section id="settings" className={`side-panel ops-page${isActiveSection ? " is-nav-target" : ""}`}>
@@ -83,6 +91,31 @@ export function SettingsPage({
         </label>
         {selectedRepo ? <div className="ops-path">{selectedRepo.path}</div> : null}
       </div>
+
+      <section className="settings-section">
+        <header>
+          <KeyRound size={16} />
+          <h3>API access</h3>
+        </header>
+        <p className="brain-muted">Enter the access token configured by your administrator. It is kept for this browser tab's session.</p>
+        <form className="brain-token-form" onSubmit={updateToken}>
+          <label className="field">
+            <span>Access token</span>
+            <input
+              type="password"
+              autoComplete="off"
+              value={accessToken}
+              onChange={(event) => setAccessToken(event.target.value)}
+              placeholder="API access token"
+            />
+          </label>
+          <button className="brain-button" type="submit">Save token</button>
+          <button className="brain-button is-secondary" type="button" onClick={() => {
+            setAccessToken("");
+            saveAccessToken("");
+          }}>Clear token</button>
+        </form>
+      </section>
 
       <div className="ops-summary">
         <div>

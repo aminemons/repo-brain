@@ -45,7 +45,7 @@ export function AskPage({
       {repoError || askError ? <div className="ask-error">{repoError ?? askError}</div> : null}
 
       {answer ? (
-        <AskResult answer={answer} relatedNodeIds={relatedNodeIds} onHighlight={highlightCurrentAnswer} />
+        <AskResult key={answer.trace_id} repoId={selectedRepoId} answer={answer} relatedNodeIds={relatedNodeIds} onHighlight={highlightCurrentAnswer} />
       ) : null}
     </section>
   );

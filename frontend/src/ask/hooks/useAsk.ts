@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { askRepo } from "../../api/ask";
 import type { AskResponse } from "../../api/types";
@@ -9,6 +9,14 @@ export function useAsk(selectedRepoId: string) {
   const [answer, setAnswer] = useState<AskResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setAnswer(null);
+    setError(null);
+    setLoading(false);
+    return () => requestRef.current?.abort();
+  }, [selectedRepoId]);
 
   const relatedNodeIds = useMemo(() => getRelatedNodeIds(answer), [answer]);
 
@@ -22,15 +30,19 @@ export function useAsk(selectedRepoId: string) {
 
       setLoading(true);
       setError(null);
+      const controller = new AbortController();
+      requestRef.current = controller;
       try {
-        const response = await askRepo(selectedRepoId, trimmedQuestion);
+        const response = await askRepo(selectedRepoId, trimmedQuestion, controller.signal);
+        if (controller.signal.aborted) return;
         setAnswer(response);
         highlightRelatedNodes(selectedRepoId, response);
       } catch (apiError) {
+        if (controller.signal.aborted) return;
         setAnswer(null);
         setError(apiError instanceof Error ? apiError.message : "Ask failed");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     },
     [loading, question, selectedRepoId]

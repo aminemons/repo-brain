@@ -1,4 +1,4 @@
-import { API_BASE, readJson } from "./http";
+import { API_BASE, apiFetch, readJson } from "./http";
 import type {
   GenerateWikiPagesResponse,
   TranslateWikiResponse,
@@ -8,7 +8,7 @@ import type {
 } from "./types";
 
 export async function getRepoWiki(repoId: string, language = "en"): Promise<WikiResponse> {
-  const response = await fetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki${languageQuery(language)}`);
+  const response = await apiFetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki${languageQuery(language)}`);
   return readJson(response, "Repository wiki");
 }
 
@@ -16,7 +16,7 @@ export async function generateWikiPages(
   repoId: string,
   language = "en"
 ): Promise<GenerateWikiPagesResponse> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki/pages/generate${languageQuery(language)}`,
     {
       method: "POST"
@@ -29,7 +29,7 @@ export async function updateWikiPages(
   repoId: string,
   language = "en"
 ): Promise<UpdateWikiPagesResponse> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki/pages/update${languageQuery(language)}`,
     {
       method: "POST",
@@ -49,7 +49,7 @@ export async function regenerateWikiPage(
   slug: string,
   language = "en"
 ): Promise<WikiPageGenerationResult> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki/pages/${encodeURIComponent(slug)}/regenerate${languageQuery(language)}`,
     {
       method: "POST"
@@ -63,7 +63,7 @@ export async function translateWiki(
   targetLanguage: string,
   sourceLanguage = "en"
 ): Promise<TranslateWikiResponse> {
-  const response = await fetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki/translate`, {
+  const response = await apiFetch(`${API_BASE}/repos/${encodeURIComponent(repoId)}/wiki/translate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"

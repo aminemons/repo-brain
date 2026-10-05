@@ -1,3 +1,5 @@
+import type { SourceCard } from "../brain/types";
+
 export type RepoSummary = {
   id: string;
   name: string;
@@ -194,6 +196,7 @@ export type SourceRef = {
 export type AskResponse = {
   answer: string;
   sources: SourceRef[];
+  documentation_sources?: SourceCard[];
   related_nodes: Array<Record<string, unknown> & { id?: string; name?: string; type?: string }>;
   related_edges: Array<Record<string, unknown> & { id?: string; type?: string; source_id?: string; target_id?: string }>;
   related_communities?: Array<Record<string, unknown> & { id?: string; name?: string }>;
