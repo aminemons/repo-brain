@@ -64,46 +64,42 @@ exit $process.ExitCode
 '@
     Set-Content -LiteralPath $workerPath -Value $workerSource -Encoding utf8
 
-    $psExecutable = if ($PSHOME -and (Test-Path -LiteralPath (Join-Path $PSHOME 'pwsh.exe'))) {
-        Join-Path $PSHOME 'pwsh.exe'
-    }
-    else {
-        Join-Path $PSHOME 'powershell.exe'
-    }
-    if (-not (Test-Path -LiteralPath $psExecutable -PathType Leaf)) {
-        throw 'Could not find PowerShell to create the detached background worker.'
-    }
-    $workerInvocation = @(
-        '&', (ConvertTo-Json -InputObject $workerPath -Compress),
-        '-PythonExecutable', (ConvertTo-Json -InputObject $Executable -Compress),
-        '-Arguments', "@($((ConvertTo-Json -InputObject $Arguments -Compress).TrimStart('[').TrimEnd(']')))",
-        '-ProjectDirectory', (ConvertTo-Json -InputObject $projectDirectory -Compress),
-        '-StdoutPath', (ConvertTo-Json -InputObject $stdoutPath -Compress),
-        '-StderrPath', (ConvertTo-Json -InputObject $stderrPath -Compress),
-        '-PidPath', (ConvertTo-Json -InputObject $pidPath -Compress),
-        '-Port', "$Port"
-    ) -join ' '
+    $taskName = "RepoBrain-Local-$Port"
+    $psExecutable = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+    function Quote-PSLiteral([string]$Value) { return "'" + $Value.Replace("'", "''") + "'" }
+    $argumentList = ($Arguments | ForEach-Object { Quote-PSLiteral $_ }) -join ','
+    $workerInvocation = '& ' + (Quote-PSLiteral $workerPath) +
+        ' -PythonExecutable ' + (Quote-PSLiteral $Executable) +
+        ' -Arguments @(' + $argumentList + ')' +
+        ' -ProjectDirectory ' + (Quote-PSLiteral $projectDirectory) +
+        ' -StdoutPath ' + (Quote-PSLiteral $stdoutPath) +
+        ' -StderrPath ' + (Quote-PSLiteral $stderrPath) +
+        ' -PidPath ' + (Quote-PSLiteral $pidPath) + ' -Port ' + $Port
     $encodedInvocation = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($workerInvocation))
-    $commandLine = "`"$psExecutable`" -NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $encodedInvocation"
-    try {
-        $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-            CommandLine = $commandLine
-            CurrentDirectory = $projectDirectory
-        }
-        if ($created.ReturnValue -ne 0 -or -not $created.ProcessId) {
-            throw "Windows process creation returned code $($created.ReturnValue)."
-        }
-        $workerProcessId = [int]$created.ProcessId
-    }
-    catch {
-        throw "Could not create the detached Project Brain worker. Ensure Windows CIM process creation is available. $($_.Exception.Message)"
-    }
+    $scheduler = New-Object -ComObject Schedule.Service
+    $scheduler.Connect()
+    $task = $scheduler.NewTask(0)
+    $task.RegistrationInfo.Description = 'Local Repo Brain server. Started manually; no recurring schedule.'
+    $task.Principal.LogonType = 3
+    $task.Principal.RunLevel = 0
+    $task.Settings.ExecutionTimeLimit = 'PT0S'
+    $task.Settings.DisallowStartIfOnBatteries = $false
+    $task.Settings.StopIfGoingOnBatteries = $false
+    $task.Settings.Hidden = $true
+    $action = $task.Actions.Create(0)
+    $action.Path = $psExecutable
+    $action.Arguments = "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand $encodedInvocation"
+    $action.WorkingDirectory = $projectDirectory
+    $registered = $scheduler.GetFolder('\').RegisterTaskDefinition(
+        $taskName, $task, 6, [System.Security.Principal.WindowsIdentity]::GetCurrent().Name, $null, 3
+    )
+    $registered.Run($null) | Out-Null
+    $workerProcessId = $taskName
     Write-Host "Starting Project Brain in the background (worker PID $workerProcessId)."
 
     $deadline = [DateTime]::UtcNow.AddSeconds($HealthTimeoutSeconds)
     while ([DateTime]::UtcNow -lt $deadline) {
-        $worker = Get-Process -Id $workerProcessId -ErrorAction SilentlyContinue
-        if (-not $worker) {
+        if ($registered.State -eq 3 -and (Test-Path -LiteralPath $stderrPath)) {
             $tail = @(Get-SafeLogTail $stderrPath) + @(Get-SafeLogTail $stdoutPath)
             $details = if ($tail.Count) { "`n$($tail -join "`n")" } else { '' }
             throw "Project Brain exited during startup. Logs: $stderrPath and $stdoutPath$details"
