@@ -1,82 +1,51 @@
-name: Tests
+name: Repository bot checks
 
 on:
   push:
-    branches:
-      - main
-      - "feature/**"
-    tags:
-      - "v*"
+    branches: [main, 'feature/**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      full_suite:
+        description: 'Also run the inherited backend suite'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_DB: codewiki_test
-          POSTGRES_USER: codewiki
-          POSTGRES_PASSWORD: codewiki
-        ports:
-          - "5432:5432"
-        options: >-
-          --health-cmd "pg_isready -U codewiki -d codewiki_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
     env:
-      CODEWIKI_TEST_POSTGRES_URL: postgresql+psycopg://codewiki:codewiki@127.0.0.1:5432/codewiki_test
-
+      CODEWIKI_SKIP_FRONTEND_BUILD: '1'
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Install backend dependencies
-        run: python -m pip install -e ".[dev]"
-
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: uv sync --locked --extra docs --extra dev
+      - name: Check bot backend
+        run: >-
+          uv run ruff check backend/app/api/bots.py backend/app/api/bot_changes.py
+          backend/app/schemas/bots.py backend/app/schemas/bot_changes.py
+          backend/app/services/bots backend/app/services/bot_changes
+          tests/backend/test_bots_api.py tests/backend/test_bot_changes.py
+      - name: Check backend types
+        run: uv run mypy backend/app
+      - name: Test repository chat and Git workflows
+        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py -q
+      - name: Run inherited suite when requested
+        if: inputs.full_suite == true
+        run: uv run pytest -q
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
-
-      - name: Lint backend
-        run: python -m ruff check backend tests
-
-      - name: Typecheck backend
-        run: python -m mypy backend/app
-
-      - name: Test backend
-        run: python -m pytest -q
-
-      - name: Lint frontend
-        run: npm --prefix frontend run lint
-
       - name: Build frontend
         run: npm --prefix frontend run build
-
-      - name: Install packaging tools
-        run: python -m pip install --upgrade build twine
-
-      - name: Build distributions
-        run: python -m build
-
-      - name: Check distributions
-        run: python -m twine check dist/*

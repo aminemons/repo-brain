@@ -7,7 +7,9 @@ Each bot is tied to one repository. Its link, instructions, conversations, chang
 1. Add the local checkout of a repository through Repos. Choose only repositories you want to use.
 2. Open Bots and create a bot for that repository.
 3. Open its dedicated link and enter your own OpenAI API key and a model available to your account.
-4. Start a conversation to explain code or teach the project. Refresh the index when the repository changes.
+4. Start a conversation to explain code or teach the project. The first message indexes a fresh repository automatically. Refresh the index after local changes.
+
+The model field must contain an OpenAI API model ID that your account can use. A bot name or instruction such as `doit` is not a model ID. Provider failures now explain whether to check the key, model, available quota, or connection.
 
 The OpenAI key stays in page memory and is sent to the application's backend only for the requested AI operation. The backend calls OpenAI; selected, redacted project excerpts and conversation context leave your machine for those requests. Clearing the key or reloading the page requires entering it again. The application does not store the key in its database or repository. OpenAI API usage is billed to the supplied key's account.
 

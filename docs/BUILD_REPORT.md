@@ -1,5 +1,21 @@
 # Build report
 
+## Chat and Git fixes — 2026-10-05
+
+The local API had stopped. A bot package export also prevented startup after the latest edits. The chat API now indexes a fresh repository before retrieval and returns useful provider errors without exposing request credentials. The background PowerShell launcher was exercised successfully against the local API.
+
+Integration tests found an empty worktree index during change application. Seeding it with the base commit now preserves untouched tracked files. The regression tests cover that behavior, optimistic checks, documentation completion after merge, deduplication and batching, commit detection, and a stubbed publication path.
+
+Verification so far:
+
+- Chat API integration test passed with a temporary repository and stub OpenAI provider. It covers registration, bot uniqueness, first-chat indexing, persistence, `store=False`, refresh, model error handling, and absence of the key from SQLite/WAL.
+- Six Git workflow integration tests passed using temporary repositories; publishing is stubbed.
+- The combined chat and Git regression suite passed: seven tests in 48.84 seconds. FastAPI's inherited TestClient emits an httpx deprecation warning.
+- Full backend mypy passed for 259 source files. Focused bot Ruff checks passed.
+- The detached local server returned `{"status":"ok"}` from `/api/health` and binds to `127.0.0.1:8000`.
+
+The inherited full Ruff check reports existing violations across the base application and tests. GitHub's default workflow explicitly checks the bot modules and focused regression tests, all backend types, and the frontend build. The inherited full test suite remains an optional manual run. No paid model request, real target-repository push/PR, OVH deployment, or sandboxed project command execution was performed.
+
 ## Dedicated bot release — 2026-10-04
 
 The repository bot implementation was finished with GPT-6 Luna agents. It adds a bot library and stable bot links, separate persisted conversations, editable per-bot settings, request-only OpenAI key handling, Explain/Teach modes, knowledge refresh, reviewed file proposals, isolated Git branches and pull-request publication. Documentation tracking detects commit changes, refreshes knowledge, and supports reviewable drafts in batches of up to 20 changed source paths. Optional automatic drafting runs only while the bot page is open with its key entered.

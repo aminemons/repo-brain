@@ -1,186 +1,87 @@
-# CodeWiki
+# Repo Brain
 
-<p align="center">
-  <strong>English</strong>
-  &nbsp;·&nbsp;
-  <a href="./docs/README.zh-CN.md">简体中文</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/usage.md">Usage Guide</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/design.md">Design</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/benchmarking.md">Benchmarks</a>
-  &nbsp;·&nbsp;
-  <a href="./docs/changelog.md">Changelog</a>
-</p>
+A workspace for the repositories you work on. Create a bot for each repo, ask it to explain the code, and review proposed changes with their documentation.
 
-<p align="center">
-  <a href="https://github.com/PorunC/CodeWiki/actions/workflows/test.yml"><img src="https://img.shields.io/github/actions/workflow/status/PorunC/CodeWiki/test.yml?style=flat-square&label=tests&labelColor=161b22&logo=githubactions&logoColor=white" alt="Tests"/></a>
-  <a href="./LICENSE"><img src="https://img.shields.io/github/license/PorunC/CodeWiki?style=flat-square&color=8b949e&labelColor=161b22" alt="License"/></a>
-  <a href="https://pepy.tech/projects/codewiki"><img src="https://static.pepy.tech/personalized-badge/codewiki?period=total&units=INTERNATIONAL_SYSTEM&left_color=BLACK&right_color=GREEN&left_text=downloads" alt="PyPI downloads"/></a>
-  <a href="https://github.com/PorunC/CodeWiki/stargazers"><img src="https://img.shields.io/github/stars/PorunC/CodeWiki.svg?style=flat-square&color=dbab09&labelColor=161b22&logo=github&logoColor=white" alt="GitHub stars"/></a>
-</p>
+Each bot has its own link, instructions, conversations, and change history. You choose which repositories to add. Model requests use the OpenAI API key you enter for that session.
 
-CodeWiki is a single-user code intelligence platform for AST-based repository analysis,
-GraphRAG retrieval, source-grounded wiki generation, and LiteLLM-powered Q&A.
+## Run locally
 
-## Screenshots
+Requirements: Python 3.12+, Node.js 22+, Git, and [uv](https://docs.astral.sh/uv/).
 
-![CodeWiki wiki page](docs/img/wiki.png)
-
-![CodeWiki graph explorer](docs/img/graph.png)
-
-## Highlights
-
-- Analyze Python, TypeScript/TSX, JavaScript/JSX, Java, Go, Rust, C, C++, and C#.
-- Build deterministic code graphs for imports, definitions, calls, routes, inheritance,
-  source references, and configuration usage.
-- Generate DeepWiki-style catalogs and pages with source citations, diagrams,
-  translations, incremental updates, and browser-side exports.
-- Install the bundled Codex skill so Codex can plan, write, validate, and export
-  source-grounded wiki pages from local CodeWiki evidence.
-- Ask GraphRAG-grounded questions through the Web UI, CLI, HTTP API, or MCP server.
-- Use Lite Mode for a project-local, no-LLM graph index optimized for AI agent context,
-  traces, impact analysis, and MCP tools.
-- Use SQLite by default, or PostgreSQL with full-text search and optional pgvector
-  vector search.
-
-## Quick Start
-
-Install from PyPI:
-
-```bash
-pip install codewiki
-codewiki serve
+```powershell
+git clone https://github.com/aminemons/repo-brain.git
+cd repo-brain
+.\scripts\start-project-brain.ps1 -Setup
 ```
 
-Open `http://127.0.0.1:8000`, register a repository, run analysis, then generate a
-wiki or ask questions.
+Open [localhost:8000](http://127.0.0.1:8000/bots). For later launches, run the script without `-Setup`.
 
-Run with Docker Compose:
+To keep the app running after closing the terminal:
 
-```bash
-docker compose up --build
+```powershell
+.\scripts\start-project-brain.ps1 -Background
 ```
 
-The packaged Python app includes the built frontend. A source checkout is only needed
-for development or Docker-based local runs.
+The launcher waits for a healthy API and writes its PID and logs to `.run/`.
 
-## Common Commands
+Manual setup works on other platforms:
 
-```bash
-codewiki repos add . --name my-repo
-codewiki analyze .
-codewiki graphrag build . --embeddings
-codewiki wiki catalog .
-codewiki wiki pages .
-codewiki skill install codex
-codewiki wiki plan . --json
-codewiki ask --repo my-repo "How does the main workflow fit together?"
-codewiki mcp
+```sh
+uv sync --locked --extra docs
+npm --prefix frontend ci
+npm --prefix frontend run build
+uv run --locked --extra docs python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Most repository arguments accept an id, id prefix, registered name, path, or Git URL.
-Use `--json` for machine-readable output.
+## Create your first bot
 
-### Lite Mode
+1. Open **Bots** and add a local checkout or a GitHub repository URL.
+2. Create its bot and open the bot's link.
+3. Enter your OpenAI API key and choose a model your API account can access.
+4. Send a question. The first conversation indexes the repository automatically.
 
-Lite Mode creates a project-local `.codewiki/codewiki-lite.sqlite3` index and skips
-LLM, Wiki, GraphRAG chunk, and Web UI workflows. It is intended for local AI assistants
-that need fast symbol search, source context, call traces, and affected-file analysis.
+You can ask for an explanation, a lesson, or a code change. Answers include repository evidence when available. Refresh knowledge after local changes; the watcher also tracks new commits.
 
-```bash
-codewiki lite index .
-codewiki lite query AuthService
-codewiki lite context "how authentication works"
-codewiki lite trace LoginForm createSession
-codewiki lite callers generate_page
-codewiki lite affected src/auth.py
-codewiki lite agents install . --target all
-codewiki mcp --lite --path .
-```
+The key stays in page and request memory. Reloading the page clears it. API usage is billed to the account that owns the key. Selected repository excerpts and conversation context are sent to OpenAI for these requests.
 
-`codewiki lite status` reports pending file changes. `codewiki lite sync` refreshes the
-index, and `codewiki lite watch` keeps it fresh with a polling watcher. MCP Lite Mode
-catches up an existing index on startup unless `--no-sync` is passed.
-`codewiki lite agents install` can write Codex CLI and Claude Code MCP config plus
-agent instructions for the project.
+For private GitHub repositories, authenticate Git on the machine running Repo Brain. Your OpenAI key gives access to the model; Git credentials give access to the repository.
 
-### Codex Skill
+## Changes and documentation
 
-CodeWiki ships a Codex-ready skill for agent-written wiki pages. It installs to
-`$CODEX_HOME/skills/codewiki`, or `~/.codex/skills/codewiki` when `CODEX_HOME` is not
-set, and includes compact evidence and standalone HTML export helpers:
+A change starts as a proposal you can inspect. Applying it creates a separate Git branch and worktree. Publishing opens a pull request for review. Merge it through your normal GitHub workflow.
 
-```bash
-codewiki skill install codex
-codewiki wiki plan . --language en --json
-codewiki wiki evidence overview . --language en --limit 5 --json
-cat overview.md | codewiki wiki save overview . --language en --title "Overview" --stdin --json
-codewiki wiki validate overview . --language en --json
-```
+The documentation watcher detects new commits and queues reviews. It can update clean GitHub checkouts cloned by the app. Update external local checkouts yourself. Documentation drafting needs your API key; optional automatic drafting runs while the bot page is open.
 
-This workflow does not call CodeWiki's external LLM-backed wiki generator. Codex reads
-bounded source evidence, writes Markdown with CodeWiki source citations, saves it into
-the normal wiki store, and validates the saved page before export or publication.
+Proposals use bounded file context. Sensitive paths and unsupported files are refused. The bot does not run your project's commands or tests, so verify changes before merging.
 
 ## Configuration
 
-CodeWiki defaults to SQLite:
+Copy `.env.example` to `.env` to configure paths, model settings, and access tokens. Configure `CODEWIKI_AUTH_TOKEN` before making the app remotely accessible. Enter that owner token in **Settings**. Bind to localhost for local use.
 
-```bash
-CODEWIKI_DATABASE_URL=sqlite+aiosqlite:///./data/codewiki.sqlite3
-```
+The existing graph, document search, learning maps, and local inference workflow are also available. The original model gateway supports local-only inference; repository bots use the explicitly supplied OpenAI key.
 
-PostgreSQL is also supported:
-
-```bash
-CODEWIKI_DATABASE_URL=postgresql+psycopg://codewiki:codewiki@localhost:5432/codewiki
-```
-
-Configure LLM profiles with `codewiki config` or `.env`:
-
-```bash
-codewiki config
-codewiki config --set CODEWIKI_LLM__DEFAULT__MODEL=openai/gpt-4.1
-codewiki config --profile qa --model openai/gpt-4.1 --api-key "$OPENAI_API_KEY"
-```
-
-## Documentation
-
-- [Usage Guide](docs/usage.md): installation, Docker, database setup, wiki workflow,
-  Codex skill setup, LLM profiles, CLI, MCP, HTTP API, and supported languages.
-- [Design Notes](docs/design.md): architecture and feature design.
-- [Benchmarking Guide](docs/benchmarking.md) and
-  [Benchmark Report](docs/benchmark-report-2026-05-22.md): benchmark workflow and
-  current results.
-- [Changelog](docs/changelog.md): release history.
+Application data lives in `data/` and `storage/`. These directories, private environment files, and runtime logs are excluded from Git.
 
 ## Development
 
-```bash
-make install
-make start
-make lint
-make typecheck
-make test
-make build
+```sh
+uv sync --locked --extra docs --extra dev
+uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py
+uv run mypy backend/app
+npm --prefix frontend run build
 ```
 
-Default local URLs:
+The focused bot tests use temporary repositories and a stub model provider. They do not spend API credits or modify your repositories. See [the build report](docs/BUILD_REPORT.md) for verification results.
 
-- Backend: `http://127.0.0.1:8000`
-- Frontend: `http://127.0.0.1:5173`
+## Further reading
 
-### Python Typing
+- [Bot guide](docs/BOT_USER_GUIDE.md)
+- [Deployment](deploy/README.md)
+- [Security](SECURITY.md)
+- [Current plan status](docs/PLAN_STATUS.md)
 
-Python type checking uses `mypy` with a gradual configuration in `pyproject.toml`.
-New public service, repository, API helper, and CLI helper functions should include
-explicit parameter and return types. Prefer dataclasses, Pydantic models, `TypedDict`,
-or `Protocol` over broad `dict[str, Any]` when data crosses module boundaries. Keep
-`Any` near integration edges such as LLM JSON payloads, SQLAlchemy JSON columns, and
-third-party parser output.
+Individual user accounts, sandboxed project command execution, and document embeddings remain unfinished. Hosting on OVH and live model responses need validation in your environment.
 
 ## License
 
-MIT
+MIT. Built on [PorunC/CodeWiki](https://github.com/PorunC/CodeWiki), with its license preserved. See [LICENSE](LICENSE) and [third-party notices](THIRD_PARTY_NOTICES.md).

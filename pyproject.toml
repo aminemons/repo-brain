@@ -1,7 +1,7 @@
 [project]
 name = "codewiki"
 version = "0.6.5"
-description = "Code wiki platform with AST graph analysis, GraphRAG, SQLite/PostgreSQL storage, and LiteLLM."
+description = "Repository assistants with code search, conversations, reviewed changes, and documentation tracking."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12"
@@ -59,9 +59,9 @@ codewiki = "backend.app.cli:main"
 codewiki-mcp = "backend.app.mcp_server:main"
 
 [project.urls]
-Homepage = "https://github.com/PorunC/CodeWiki"
-Repository = "https://github.com/PorunC/CodeWiki"
-Issues = "https://github.com/PorunC/CodeWiki/issues"
+Homepage = "https://github.com/aminemons/repo-brain"
+Repository = "https://github.com/aminemons/repo-brain"
+Issues = "https://github.com/aminemons/repo-brain/issues"
 
 [project.optional-dependencies]
 docs = ["pypdf>=5.0,<7"]
