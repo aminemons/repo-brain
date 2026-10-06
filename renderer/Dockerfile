@@ -20,7 +20,7 @@ RUN apt-get update \
 WORKDIR /app
 ENV HOME=/tmp DOTNET_CLI_HOME=/tmp/.dotnet DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_NOLOGO=1 DOTNET_CLI_TELEMETRY_OPTOUT=1
 COPY --from=dotnet-runtime /usr/share/dotnet/ /usr/share/dotnet/
-COPY --from=dotnet-runtime /usr/bin/dotnet /usr/bin/dotnet
+RUN ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
 COPY --from=dotnet-build /out/ /app/dotnet/
 COPY renderer/worker.py /app/
 COPY --from=dotnet-build /src/najm/LICENSE /app/notices/NAJM-LICENSE
