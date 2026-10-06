@@ -1,5 +1,23 @@
 # Build report
 
+## Repository and interface repairs — 2026-10-06
+
+The bot interface now loads repository details and conversation history independently, offers retry controls, clears the previous transcript when switching conversations, and prevents overlapping conversation creation and message sends. Failed repository-plus-bot creation keeps the form values and explains how to reuse the registered repository. Authentication checks use a protected endpoint and typed HTTP errors; a rejected token is reported as a login problem.
+
+Repository registration normalizes GitHub URL aliases and reuses existing checkouts. Cloning uses a temporary directory, a three-minute deadline, noninteractive credentials, and cleanup after failure. Remote URLs with embedded credentials are refused, and older metadata URLs are redacted before display. Index refresh and first-message indexing share a repository lock. Updating the server checks for untracked as well as tracked local source changes.
+
+Secondary workspace pages load on demand. The main JavaScript entry fell from about 2.2 MB to 423 kB before gzip; the deferred diagram libraries still produce chunk-size warnings. Compatible dependency updates removed the high and moderate npm audit findings. Two low-severity findings remain in the Mermaid/KaTeX dependency chain.
+
+Verification:
+
+- 37 focused repository, chat, Git, illustration, and worker tests passed locally and in Linux CI. They cover owner/viewer access, bot history isolation, failed requests without incomplete turns, clone cleanup, URL alias reuse, and reviewed Git changes.
+- Full backend type checks, focused Ruff, frontend lint, TypeScript, and production builds passed.
+- A test-only Linux deployment uses the production API, database, index, authentication, and real Najm worker with deterministic model responses. The override is explicitly mounted by CI; ordinary server setup uses the production entrypoint.
+- The complete Chromium journey passed in [Linux CI run 37522910146](https://github.com/aminemons/repo-brain/actions/runs/37522910146): token rejection and acceptance, two repository bots, chat success and failure, persisted and isolated history, a decoded protected Najm image, mobile overflow checks, and applying a reviewed README change on a separate branch.
+- Chat follows new answers and loaded images until the reader scrolls up, then offers Jump to latest. The browser check confirms the new illustration decodes and the conversation scrolls to its latest reply. The composer keeps the full data-use guidance in a disclosure, leaving more space for messages.
+
+The actual OVH installation, paid model responses using the owner's key, and real target-repository PR publication still need validation in the owner's environment. This update does not complete the unfinished features listed in `PLAN_STATUS.md`.
+
 ## Najm and Linux server setup — 2026-10-06
 
 Implemented with GPT-6 Luna agents. The bot UI now offers Illustrate, keeps drafts after failed sends, and fetches protected PNGs with the owner token. The backend stores a bounded evidence map and provenance manifest beside each successful illustration. Failed provider/index requests leave no partial conversation turn; renderer failures preserve the text answer.
