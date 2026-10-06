@@ -39,6 +39,10 @@ On the server, read `CODEWIKI_AUTH_TOKEN` in `deploy/server.env`. Enter that val
 
 Your OpenAI key stays in page/request memory and clears on reload. It is different from the owner token and GitHub credentials.
 
+Paste the repository's root URL, such as `https://github.com/owner/project`, rather than a file or branch page. Different GitHub URL spellings reuse the same registered checkout. A failed clone is cleaned up so you can correct GitHub access and retry. Cloning stops after three minutes; a large repository may need a checkout mounted on the server instead.
+
+If a message fails, its draft stays in the composer. Check the reported error, your API key and selected model, then send it again. A failed request does not add an incomplete turn to conversation history.
+
 For private repositories or publishing branches and pull requests, put a GitHub token in `GH_TOKEN` in `deploy/server.env`, then run `bash scripts/server.sh up`. Give it access only to the repositories you choose, with Contents and Pull requests write permissions when publishing changes. The application image includes Git and the GitHub CLI. A path on your own PC is unavailable to the server; use a GitHub URL or deliberately mount a server checkout.
 
 ## Optional HTTPS domain
