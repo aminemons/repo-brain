@@ -11,9 +11,8 @@ import os
 import re
 import subprocess
 import sys
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Self
 
 
 def _prepare_fixture_repositories() -> None:
@@ -97,7 +96,7 @@ class _FakeAsyncOpenAI:
             raise RuntimeError("unexpected model client configuration in e2e test")
         self.responses = _FakeOpenAIResponses()
 
-    async def __aenter__(self) -> _FakeAsyncOpenAI:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *args: object) -> None:
@@ -127,8 +126,8 @@ class _FakeProposalResponse:
 
 def _install_test_providers() -> None:
     from backend.app.config import get_settings
-    from backend.app.services.bots import service as bots_service
     from backend.app.services.bot_changes import service as changes_service
+    from backend.app.services.bots import service as bots_service
 
     settings = get_settings()
     if not settings.auth_token:

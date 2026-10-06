@@ -42,6 +42,8 @@ def test_bot_first_message_indexes_locally_and_persists_without_key(
     monkeypatch.setenv("CODEWIKI_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'bots.sqlite3'}")
     monkeypatch.setenv("CODEWIKI_STORAGE_DIR", str(tmp_path / "storage"))
     monkeypatch.setenv("CODEWIKI_BOT_DOCUMENTATION_WATCH_ENABLED", "false")
+    monkeypatch.setenv("CODEWIKI_AUTH_TOKEN", "")
+    monkeypatch.setenv("CODEWIKI_VIEWER_TOKEN", "")
     monkeypatch.setenv("CODEWIKI_NAJM_ENABLED", "true")
     get_settings.cache_clear()
     get_store.cache_clear()
