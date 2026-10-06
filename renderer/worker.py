@@ -97,6 +97,10 @@ def render_png(
         raise RenderError("renderer process could not start") from exc
 
     if result.returncode != 0:
+        diagnostic = getattr(result, "stderr", b"")
+        if isinstance(diagnostic, bytes):
+            diagnostic = diagnostic[:2048].decode("utf-8", errors="replace")
+        print("renderer process failed: " + str(diagnostic)[:2048], flush=True)
         raise RenderError("renderer could not draw this graph")
     image = result.stdout
     if not isinstance(image, bytes) or image[:8] != PNG_SIGNATURE:
