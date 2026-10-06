@@ -167,6 +167,7 @@ def test_publish_uses_noninteractive_stubbed_git_and_gh(bot_fixture, monkeypatch
 
     def run(args, **kwargs):
         if args[0] == "gh":
+            assert args[args.index("--repo") + 1] == "example/fixture"
             calls.append(list(args))
             if args[1:3] == ["pr", "view"]:
                 return SimpleNamespace(returncode=1, stdout="", stderr="")

@@ -568,6 +568,7 @@ class BotChangeService:
             remote = _run_git(root, "remote", "get-url", "origin")
             if not _valid_github_remote(remote):
                 raise ValueError("Publishing requires a standard GitHub origin remote without embedded credentials.")
+            github_repository = remote.removeprefix("https://github.com/").removeprefix("git@github.com:").removesuffix(".git")
             if not shutil.which("gh"):
                 raise ValueError("GitHub CLI (gh) is not installed.")
             body_path = worktree.parent / "pull-request.md"
@@ -590,7 +591,7 @@ class BotChangeService:
             env["GH_PROMPT_DISABLED"] = "1"
             try:
                 existing = subprocess.run(
-                    ["gh", "pr", "view", snapshot["branch"], "--json", "url", "--jq", ".url"],
+                    ["gh", "pr", "view", snapshot["branch"], "--repo", github_repository, "--json", "url", "--jq", ".url"],
                     cwd=worktree, capture_output=True, text=True, timeout=60,
                     check=False, env=env, shell=False,
                 )
@@ -604,7 +605,7 @@ class BotChangeService:
                     if push.returncode:
                         raise ValueError("Publishing failed. Check GitHub network access and credentials.")
                     pr = subprocess.run(
-                        ["gh", "pr", "create", "--fill", "--title", snapshot["summary"][:200],
+                        ["gh", "pr", "create", "--repo", github_repository, "--fill", "--title", snapshot["summary"][:200],
                          "--body-file", str(body_path), "--head", snapshot["branch"],
                          "--base", snapshot["base_branch"]],
                         cwd=worktree, capture_output=True, text=True, timeout=120, check=False, env=env, shell=False,
