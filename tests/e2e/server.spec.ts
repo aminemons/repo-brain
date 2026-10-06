@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:8000";
 const ownerToken = process.env.OWNER_TOKEN;
@@ -9,8 +10,12 @@ test.describe.configure({ mode: "serial" });
 
 test.afterEach(async ({ page }, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus) return;
-  await testInfo.attach("e2e-failure.png", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
-  await testInfo.attach("e2e-failure-dom.txt", { body: await page.locator("body").innerText(), contentType: "text/plain" });
+  const screenshot = testInfo.outputPath("e2e-failure.png");
+  const pageText = testInfo.outputPath("e2e-failure-dom.txt");
+  await page.screenshot({ path: screenshot, fullPage: true });
+  await writeFile(pageText, await page.locator("body").innerText());
+  await testInfo.attach("e2e-failure.png", { path: screenshot, contentType: "image/png" });
+  await testInfo.attach("e2e-failure-dom.txt", { path: pageText, contentType: "text/plain" });
 });
 
 test("owner setup, repository bots, isolated history, Najm rendering, and reviewed docs change", async ({ page }, testInfo) => {
@@ -74,8 +79,10 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await expect(illustration).toBeVisible({ timeout: 60_000 });
   await expect(illustration.locator("img")).toBeVisible({ timeout: 60_000 });
   await expect(illustration.locator("img")).toHaveAttribute("src", /^blob:/);
+  const desktopScreenshot = testInfo.outputPath("e2e-populated-chat-desktop.png");
+  await page.screenshot({ path: desktopScreenshot, fullPage: true });
   await testInfo.attach("e2e-populated-chat-desktop.png", {
-    body: await page.screenshot({ fullPage: true }),
+    path: desktopScreenshot,
     contentType: "image/png",
   });
 
@@ -83,8 +90,10 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await expect.poll(() => page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
   )).toBe(true);
+  const mobileScreenshot = testInfo.outputPath("e2e-populated-chat-mobile.png");
+  await page.screenshot({ path: mobileScreenshot, fullPage: true });
   await testInfo.attach("e2e-populated-chat-mobile.png", {
-    body: await page.screenshot({ fullPage: true }),
+    path: mobileScreenshot,
     contentType: "image/png",
   });
   await page.setViewportSize({ width: 1280, height: 720 });
