@@ -34,6 +34,15 @@ export type BotMessage = {
   content: string;
   created_at: string;
   sources?: BotSource[];
+  illustration?: BotIllustration | null;
+};
+
+export type BotIllustration = {
+  status: "ready" | "unavailable";
+  url?: string;
+  caption: string;
+  alt_text?: string;
+  detail?: string;
 };
 
 export type BotConversationDetail = {
@@ -125,7 +134,7 @@ export async function getBotConversation(
 export async function sendBotMessage(
   botId: string,
   conversationId: string,
-  payload: { message: string; mode: "explain" | "teach"; api_key: string },
+  payload: { message: string; mode: "explain" | "teach" | "illustrate"; api_key: string },
   signal?: AbortSignal
 ): Promise<BotMessage> {
   const response = await apiFetch(
@@ -138,6 +147,23 @@ export async function sendBotMessage(
     }
   );
   return readJson(response, "Bot message");
+}
+
+export async function getBotIllustration(botId: string, messageId: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await apiFetch(
+    `${botsUrl}/${encodeURIComponent(botId)}/messages/${encodeURIComponent(messageId)}/illustration`,
+    { signal }
+  );
+  if (!response.ok) {
+    throw new Error(response.status === 404
+      ? "The Najm illustration is no longer available."
+      : `Could not load the Najm illustration (${response.status}).`);
+  }
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("image/png")) {
+    throw new Error("The illustration service returned an unexpected file type.");
+  }
+  return response.blob();
 }
 
 export type BotChange = {

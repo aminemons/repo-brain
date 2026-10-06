@@ -19,7 +19,7 @@ export async function apiFetch(url: string, init: RequestInit = {}): Promise<Res
   } catch (error) {
     if (!init.signal?.aborted) {
       window.dispatchEvent(new Event(API_UNREACHABLE_EVENT));
-      throw new Error("Repo Brain could not reach its local service. Check that the app server is running, then retry.");
+      throw new Error("Repo Brain could not reach the API service. Check the server connection, then retry.");
     }
     throw error;
   }

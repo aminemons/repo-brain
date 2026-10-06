@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Clipboard, FileCode2, GitPullRequest, KeyRound, LoaderCircle, MessageSquareText, MessageSquarePlus, RefreshCw, Send, Settings2 } from "lucide-react";
+import { ArrowLeft, Check, Clipboard, FileCode2, GitPullRequest, Image as ImageIcon, KeyRound, LoaderCircle, MessageSquareText, MessageSquarePlus, RefreshCw, Send, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,6 +12,7 @@ import {
   getBotConversation,
   getBotConversations,
   getBotDocumentationStatus,
+  getBotIllustration,
   publishBotChange,
   refreshBotKnowledge,
   proposeBotDocumentation,
@@ -28,7 +29,7 @@ import {
 } from "../api/bots";
 import { getRepos } from "../api/repos";
 
-type BotMode = "explain" | "teach";
+type BotMode = "explain" | "teach" | "illustrate";
 type BotTab = "chat" | "changes" | "documentation";
 
 export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary: () => void }) {
@@ -43,6 +44,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
   const [apiKey, setApiKey] = useState("");
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<BotMode>("explain");
+  const [processingMode, setProcessingMode] = useState<BotMode>("explain");
   const [sending, setSending] = useState(false);
   const [refreshingKnowledge, setRefreshingKnowledge] = useState(false);
   const [refreshResult, setRefreshResult] = useState<BotRefreshResult | null>(null);
@@ -60,6 +62,8 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
   const autoDraftCommitRef = useRef<string | null>(null);
   const messageAbortRef = useRef<AbortController | null>(null);
   const refreshAbortRef = useRef<AbortController | null>(null);
+  const activeConversationRef = useRef(conversationId);
+  useEffect(() => { activeConversationRef.current = conversationId; }, [conversationId]);
 
   useEffect(() => {
     setApiKey("");
@@ -191,27 +195,31 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
     const text = message.trim();
     if (!text || !conversationId || !apiKey.trim() || sending || refreshingKnowledge) return;
     setSending(true);
+    setProcessingMode(mode);
     setError(null);
-    setMessage("");
     const controller = new AbortController();
     messageAbortRef.current?.abort();
     messageAbortRef.current = controller;
     try {
       const answer = await sendBotMessage(botId, conversationId, { message: text, mode, api_key: apiKey }, controller.signal);
-      if (controller.signal.aborted) return;
-      setDetail((current) => current ? { ...current, messages: [...current.messages, { id: `pending-${Date.now()}`, conversation_id: conversationId, role: "user", content: text, created_at: new Date().toISOString() }, answer] } : current);
-      getBotConversation(botId, conversationId, controller.signal).then((loaded) => { if (!controller.signal.aborted) setDetail(loaded); }).catch(() => undefined);
+      if (controller.signal.aborted || activeConversationRef.current !== conversationId) return;
+      setMessage((current) => current === text ? "" : current);
+      setDetail((current) => current?.conversation.id === conversationId
+        ? { ...current, messages: [...current.messages, { id: `pending-${Date.now()}`, conversation_id: conversationId, role: "user", content: text, created_at: new Date().toISOString() }, answer] }
+        : current);
+      getBotConversation(botId, conversationId, controller.signal).then((loaded) => {
+        if (!controller.signal.aborted && activeConversationRef.current === conversationId) setDetail(loaded);
+      }).catch(() => undefined);
       setConversations((current) => [...current].sort((a, b) => a.id === conversationId ? -1 : b.id === conversationId ? 1 : 0));
     } catch (sendError) {
-      if (!controller.signal.aborted) {
-        setMessage(text);
+      if (!controller.signal.aborted && activeConversationRef.current === conversationId) {
         const detail = sendError instanceof Error ? sendError.message : "Could not send message.";
         setError(/model request failed|invalid model|model.+not found|unsupported.+model/i.test(detail)
           ? `OpenAI could not complete a request with model “${bot?.model ?? "unknown"}”. Check that the model ID is valid and your key can access it.`
           : detail);
       }
     } finally {
-      if (!controller.signal.aborted) setSending(false);
+      if (!controller.signal.aborted && activeConversationRef.current === conversationId) setSending(false);
     }
   };
 
@@ -288,7 +296,9 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
             {activeTab === "chat" ? (
               <ChatPanel
                 bot={bot}
+                botId={botId}
                 detail={detail}
+                activeConversationId={conversationId}
                 conversationLoading={conversationLoading}
                 refreshingKnowledge={refreshingKnowledge}
                 hasRefreshed={refreshResult !== null}
@@ -299,6 +309,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
                 message={message}
                 onMessageChange={setMessage}
                 sending={sending}
+                processingMode={processingMode}
                 onSubmit={(event) => void submitMessage(event)}
               />
             ) : activeTab === "changes" ? (
@@ -312,10 +323,12 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
 }
 
 function ChatPanel({
-  bot, detail, conversationLoading, refreshingKnowledge, hasRefreshed, apiKey, onApiKeyChange, mode, onModeChange, message, onMessageChange, sending, onSubmit
+  bot, botId, detail, activeConversationId, conversationLoading, refreshingKnowledge, hasRefreshed, apiKey, onApiKeyChange, mode, onModeChange, message, onMessageChange, sending, processingMode, onSubmit
 }: {
   bot: Bot;
+  botId: string;
   detail: BotConversationDetail | null;
+  activeConversationId: string | null;
   conversationLoading: boolean;
   refreshingKnowledge: boolean;
   hasRefreshed: boolean;
@@ -326,14 +339,16 @@ function ChatPanel({
   message: string;
   onMessageChange: (value: string) => void;
   sending: boolean;
+  processingMode: BotMode;
   onSubmit: (event: FormEvent) => void;
 }) {
   return (
     <section className="bot-chat-panel">
       <div className="bot-chat-heading"><div><h2>{detail?.conversation.title || "Conversation"}</h2><span className="bot-model-context">{bot.model || "No model selected"}</span></div>
         <div className="bot-mode-switch" aria-label="Conversation mode">
-          <button type="button" className={mode === "explain" ? "is-active" : undefined} onClick={() => onModeChange("explain")}>Explain</button>
-          <button type="button" className={mode === "teach" ? "is-active" : undefined} onClick={() => onModeChange("teach")}>Teach</button>
+          <button type="button" disabled={sending} aria-pressed={mode === "explain"} className={mode === "explain" ? "is-active" : undefined} onClick={() => onModeChange("explain")}>Explain</button>
+          <button type="button" disabled={sending} aria-pressed={mode === "teach"} className={mode === "teach" ? "is-active" : undefined} onClick={() => onModeChange("teach")}>Teach</button>
+          <button type="button" disabled={sending} aria-pressed={mode === "illustrate"} className={mode === "illustrate" ? "is-active" : undefined} onClick={() => onModeChange("illustrate")}>Illustrate</button>
         </div>
       </div>
       {bot.instructions ? <details className="bot-instructions"><summary>Bot instructions</summary><p>{bot.instructions}</p></details> : null}
@@ -341,15 +356,16 @@ function ChatPanel({
       <div className="bot-messages" aria-live="polite">
         {conversationLoading ? <div className="bot-chat-empty">Loading conversation…</div> : null}
         {!conversationLoading && !detail ? <div className="bot-chat-empty"><MessageSquareText size={22} /><strong>Start a conversation</strong><span>Ask about this project, or switch to Teach to explore the code step by step.</span></div> : null}
-        {detail?.messages.map((item) => <MessageBubble key={item.id} message={item} />)}
+        {detail?.messages.map((item) => <MessageBubble key={item.id} botId={botId} activeConversationId={activeConversationId} message={item} />)}
+        {sending ? <div className="bot-processing" role="status"><LoaderCircle size={14} className="bot-spinner" /><span>{processingMode === "illustrate" ? "Najm is preparing a static evidence map from the cited project sources. This can take a little longer." : "Working through the project sources…"}</span></div> : null}
       </div>
       <form className={`bot-composer${refreshingKnowledge ? " is-disabled" : ""}`} onSubmit={onSubmit}>
         <label className="bot-key-field"><span><KeyRound size={13} /> OpenAI API key</span>
           <input type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => onApiKeyChange(event.target.value)} placeholder="sk-…" aria-label="Your OpenAI API key" />
         </label>
-        <p className="bot-data-note">Your key stays in this page's memory and is sent with each AI request. Selected project excerpts are sent to OpenAI to answer.</p>
+        <p className="bot-data-note">Your OpenAI key stays in this page's memory and is sent with each AI request. It is separate from the Repo Brain owner token in Settings. Selected project excerpts are sent to OpenAI to answer.</p>
         <div className="bot-compose-row">
-          <textarea value={message} onChange={(event) => onMessageChange(event.target.value)} placeholder={refreshingKnowledge ? "Chat will be available after refresh…" : mode === "teach" ? "What would you like to learn about?" : "Ask this bot about the project…"} rows={3} disabled={refreshingKnowledge} />
+          <textarea value={message} onChange={(event) => onMessageChange(event.target.value)} placeholder={refreshingKnowledge ? "Chat will be available after refresh…" : mode === "teach" ? "What would you like to learn about?" : mode === "illustrate" ? "What should Najm explain with a static evidence map?" : "Ask this bot about the project…"} rows={3} disabled={refreshingKnowledge} />
           <button type="submit" className="bots-primary-button bot-send-button" disabled={!apiKey.trim() || !message.trim() || !detail || sending || refreshingKnowledge} aria-label="Send message">
             {sending ? <LoaderCircle size={16} className="bot-spinner" /> : <Send size={16} />}{sending ? "Sending" : "Send"}
           </button>
@@ -359,15 +375,68 @@ function ChatPanel({
   );
 }
 
-function MessageBubble({ message }: { message: BotMessage }) {
+function MessageBubble({ message, botId, activeConversationId }: { message: BotMessage; botId: string; activeConversationId: string | null }) {
   return (
     <article className={`bot-message${message.role === "user" ? " is-user" : " is-assistant"}`}>
       <div className="bot-message-role">{message.role === "user" ? "You" : "Bot"}</div>
       <div className="bot-message-content"><SafeMarkdown content={message.content} /></div>
+      {message.illustration ? <NajmIllustration botId={botId} activeConversationId={activeConversationId} message={message} /> : null}
       {message.sources?.length ? <div className="bot-citations"><strong>Project sources</strong>
         {message.sources.map((source) => <details key={source.id} className="bot-citation"><summary><strong className="bot-source-id">{source.id}</strong><FileCode2 size={13} /><span>{source.path}</span><small>:{source.start_line}–{source.end_line}</small></summary>{source.snippet ? <pre>{source.snippet}</pre> : null}</details>)}
       </div> : null}
     </article>
+  );
+}
+
+function NajmIllustration({ botId, activeConversationId, message }: { botId: string; activeConversationId: string | null; message: BotMessage }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const illustration = message.illustration;
+
+  useEffect(() => {
+    if (!illustration || illustration.status !== "ready" || activeConversationId !== message.conversation_id) {
+      setImageUrl(null);
+      setError(null);
+      return;
+    }
+    const controller = new AbortController();
+    let objectUrl: string | null = null;
+    setImageUrl(null);
+    setError(null);
+    getBotIllustration(botId, message.id, controller.signal)
+      .then((blob) => {
+        if (controller.signal.aborted || activeConversationId !== message.conversation_id) return;
+        objectUrl = URL.createObjectURL(blob);
+        setImageUrl(objectUrl);
+      })
+      .catch((loadError: unknown) => {
+        if (!controller.signal.aborted && activeConversationId === message.conversation_id) {
+          setError(loadError instanceof Error ? loadError.message : "The Najm illustration could not be loaded.");
+        }
+      });
+    return () => {
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [activeConversationId, botId, illustration, message.conversation_id, message.id]);
+
+  if (!illustration || activeConversationId !== message.conversation_id) return null;
+  const unavailable = illustration.status === "unavailable";
+  return (
+    <figure className={`bot-illustration${unavailable || error ? " is-unavailable" : ""}`}>
+      <div className="bot-illustration-label"><ImageIcon size={14} /> Najm static evidence map</div>
+      {unavailable ? <p role="status">Najm could not create an illustration for this answer. The text and project citations are still available.</p> : null}
+      {error ? <p role="status">The Najm image could not be loaded. The answer and cited evidence remain available. {error}</p> : null}
+      {!unavailable && !error && !imageUrl ? <p role="status">Loading the Najm evidence map…</p> : null}
+      {imageUrl ? <img src={imageUrl} alt={illustration.alt_text || illustration.caption || "Najm static evidence map"} onError={() => {
+        URL.revokeObjectURL(imageUrl);
+        setImageUrl(null);
+        setError("The returned image could not be displayed.");
+      }} /> : null}
+      <figcaption>{illustration.caption}</figcaption>
+      {illustration.detail ? <p className="bot-illustration-detail">{illustration.detail}</p> : null}
+      <small>This is a static visualization. It does not run or modify project code.</small>
+    </figure>
   );
 }
 
