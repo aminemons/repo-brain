@@ -1,6 +1,22 @@
 # Build report
 
-## Chat and Git fixes — 2026-10-05
+## Najm and Linux server setup — 2026-10-06
+
+Implemented with GPT-6 Luna agents. The bot UI now offers Illustrate, keeps drafts after failed sends, and fetches protected PNGs with the owner token. The backend stores a bounded evidence map and provenance manifest beside each successful illustration. Failed provider/index requests leave no partial conversation turn; renderer failures preserve the text answer.
+
+The Linux server profile fixes outbound access for explicit OpenAI requests, writable app-managed Git storage, GitHub CLI availability, private-repository synchronization, and PR publication to the selected origin repository. It runs the app and a pinned Najm renderer separately, with private SSH access by default and optional Caddy HTTPS.
+
+Verification:
+
+- 20 focused chat, Git, illustration, and worker tests passed locally. Model requests and PR publication use stubs; no API credits or target repositories were used.
+- Full backend mypy passed across 260 files. Focused Ruff passed. Frontend lint, TypeScript, and Vite build passed; the existing large bundle warning remains.
+- Linux CI built both images and started them with read-only root filesystems, non-root users, limited resources, and the renderer on an internal network.
+- The real smoke check passed owner authentication, unauthorized-request rejection, frontend delivery, writable Git storage, and OpenAI/GitHub DNS and TLS connectivity.
+- Najm rendered a genuine 1400 × 1000 PNG. Its revision header, chunk checksums, decompressed pixels, dimensions, and output size were checked. The .NET host layout was corrected after a native runtime-location error.
+
+The latest workflow additionally uploads that PNG for visual review. This is Linux container verification; the actual OVH server and a response using the owner's OpenAI key remain untested. No application or native renderer was launched on the owner's PC during this update. Earlier Windows background-launch observations did not establish persistent operation through desktop sessions; use the server profile for continuous operation.
+
+## Chat and Git fixes â€” 2026-10-05
 
 Follow-up: the WMI-launched server also disappeared after the chat turn ended. Background startup now uses Windows Task Scheduler with an interactive, non-elevated principal and no triggers. The API health check and browser bot library loaded successfully after that change. The earlier cross-command check did not establish survival beyond the chat turn.
 
@@ -15,13 +31,13 @@ Verification so far:
 - The combined chat and Git regression suite passed: seven tests in 48.84 seconds. FastAPI's inherited TestClient emits an httpx deprecation warning.
 - Full backend mypy passed for 259 source files. Focused bot Ruff checks passed.
 - The detached local server returned `{"status":"ok"}` from `/api/health` and binds to `127.0.0.1:8000`.
-- The final frontend build and focused ESLint passed. Browser review covered the bot library, conversation/settings navigation, saved model changes, connection failure reporting, and the mobile composer at 390 × 844 with no horizontal page overflow.
+- The final frontend build and focused ESLint passed. Browser review covered the bot library, conversation/settings navigation, saved model changes, connection failure reporting, and the mobile composer at 390 Ã— 844 with no horizontal page overflow.
 - The Windows launcher uses a hidden WMI worker to detach the server from the launching tool session. The root-launched instance remained healthy across later build, Git, browser, and packaging commands.
 - The first GitHub workflow run passed. It checks the bot backend, all backend types, the focused regression suite, and frontend compilation.
 
 The inherited full Ruff check reports existing violations across the base application and tests. GitHub's default workflow explicitly checks the bot modules and focused regression tests, all backend types, and the frontend build. The inherited full test suite remains an optional manual run. No paid model request, real target-repository push/PR, OVH deployment, or sandboxed project command execution was performed.
 
-## Dedicated bot release — 2026-10-04
+## Dedicated bot release â€” 2026-10-04
 
 The repository bot implementation was finished with GPT-6 Luna agents. It adds a bot library and stable bot links, separate persisted conversations, editable per-bot settings, request-only OpenAI key handling, Explain/Teach modes, knowledge refresh, reviewed file proposals, isolated Git branches and pull-request publication. Documentation tracking detects commit changes, refreshes knowledge, and supports reviewable drafts in batches of up to 20 changed source paths. Optional automatic drafting runs only while the bot page is open with its key entered.
 
@@ -37,7 +53,7 @@ The build retains the existing JavaScript chunk-size warning. No automated tests
 
 Initial access uses the application's shared owner token. Individual user accounts, a process sandbox for running project commands, target evaluations, and OVH deployment remain unfinished. Proposals use bounded whole-file text edits and refuse unsupported/sensitive inputs. Tests remain deferred by the owner's direction. The source ZIP includes the compiled interface and excludes local data, environments and credentials.
 
-## Initial implementation — 2026-10-03
+## Initial implementation â€” 2026-10-03
 
 Date: 2026-10-03. This report describes compilation and static checks of the first Project Brain implementation. The user deferred tests and target-repository evaluation.
 

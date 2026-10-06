@@ -14,7 +14,7 @@ cd repo-brain
 bash scripts/setup-server.sh
 ```
 
-The first build downloads dependencies and the pinned Najm source. Setup creates `deploy/server.env` with a random owner token and restrictive permissions. It then builds both images, starts them, and checks authentication, renderer health, and connectivity to GitHub and OpenAI. It makes no paid model request.
+The first build downloads dependencies and the pinned Najm source. Setup creates `deploy/server.env` with a random owner token and restrictive permissions. It then builds both images, starts them, and checks authentication, writable repository storage, an actual Najm PNG render, and connectivity to GitHub and OpenAI. It makes no paid model request.
 
 If setup fails, inspect `bash scripts/server.sh logs`, correct the reported problem, and run `bash scripts/server.sh up` again. A healthy renderer HTTP endpoint alone does not prove rendering works; the Linux CI smoke check renders a real PNG with the same container restrictions.
 
