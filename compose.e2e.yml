@@ -1,0 +1,9 @@
+# Test-only entrypoint. The production image has no model-stub switch.
+services:
+  app:
+    command: [python, /e2e/server.py]
+    environment:
+      CODEWIKI_E2E_TEST_MODE: "1"
+      E2E_RUN_ID: ${E2E_RUN_ID:?Set a unique test run ID}
+    volumes:
+      - ./tests/e2e:/e2e:ro

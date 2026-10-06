@@ -34,14 +34,15 @@ jobs:
         run: uv sync --locked --extra docs --extra dev
       - name: Check bot backend
         run: >-
-          uv run ruff check backend/app/api/bots.py backend/app/api/bot_changes.py
+          uv run ruff check backend/app/api/bots.py backend/app/api/bot_changes.py backend/app/api/repos.py
           backend/app/schemas/bots.py backend/app/schemas/bot_changes.py
           backend/app/services/bots backend/app/services/bot_changes
+          backend/app/services/repo_scanner tests/backend/test_repo_registration.py
           tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py
       - name: Check backend types
         run: uv run mypy backend/app
       - name: Test repository chat and Git workflows
-        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py renderer/tests -q
+        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py tests/backend/test_repo_registration.py tests/backend/test_repo_scanner.py renderer/tests -q
       - name: Run inherited suite when requested
         if: inputs.full_suite == true
         run: uv run pytest -q
@@ -53,6 +54,8 @@ jobs:
   server:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      E2E_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - name: Check shell scripts and prepare private deployment
@@ -73,6 +76,27 @@ jobs:
         with:
           name: najm-linux-render
           path: najm-smoke.png
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Prepare real browser checks
+        run: |
+          npm --prefix frontend ci
+          frontend/node_modules/.bin/playwright install --with-deps chromium
+          docker compose --env-file deploy/server.env -f compose.server.yml -f compose.e2e.yml up --detach --force-recreate --wait --wait-timeout 120 app
+      - name: Test the complete bot journey in Chromium
+        run: |
+          export OWNER_TOKEN="$(sed -n 's/^CODEWIKI_AUTH_TOKEN=//p' deploy/server.env)"
+          export NODE_PATH="$PWD/frontend/node_modules"
+          frontend/node_modules/.bin/playwright test tests/e2e/server.spec.ts --reporter=line
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-journey-results
+          path: test-results/
+          if-no-files-found: ignore
       - name: Container diagnostics
         if: failure()
         run: |
