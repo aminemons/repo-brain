@@ -475,7 +475,7 @@ function ChatPanel({
       <div className="bot-messages" aria-live="polite">
         {conversationLoading ? <div className="bot-chat-empty">Loading conversation…</div> : null}
         {!conversationLoading && conversationError ? <div className="bot-chat-empty" role="alert"><strong>This conversation could not be loaded.</strong><span>{conversationError}</span><button type="button" className="bot-secondary-button" onClick={onRetryConversation}>Retry</button></div> : null}
-        {!conversationLoading && !conversationError && !detail ? <div className="bot-chat-empty"><MessageSquareText size={22} /><strong>Start a conversation</strong><span>Ask about this project, or switch to Teach to explore the code step by step.</span></div> : null}
+        {!conversationLoading && !conversationError && (!detail || detail.messages.length === 0) ? <div className="bot-chat-empty"><MessageSquareText size={22} /><strong>Start a conversation</strong><span>Ask about this project, or switch to Teach to explore the code step by step.</span></div> : null}
         {detail?.messages.map((item) => <MessageBubble key={item.id} botId={botId} activeConversationId={activeConversationId} message={item} />)}
         {sending ? <div className="bot-processing" role="status"><LoaderCircle size={14} className="bot-spinner" /><span>{processingMode === "illustrate" ? "Najm is preparing a static evidence map from the cited project sources. This can take a little longer." : "Working through the project sources…"}</span></div> : null}
       </div>
