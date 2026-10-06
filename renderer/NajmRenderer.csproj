@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../najm/src/Najm.Core/Najm.Core.csproj" />
+    <ProjectReference Include="../najm/src/Najm.Text/Najm.Text.csproj" />
+    <ProjectReference Include="../najm/src/Najm.Skia/Najm.Skia.csproj" />
+  </ItemGroup>
+</Project>
