@@ -54,7 +54,7 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await expect(page.getByText("Start a conversation")).toBeVisible();
   const apiKeyField = page.getByLabel("Your OpenAI API key");
   await apiKeyField.fill("e2e-only-test-key");
-  const composer = page.getByLabel("Message");
+  const composer = page.getByLabel("Message", { exact: true });
   await composer.fill("Explain the zeta initializer startup sequence in src/app.py.");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Deterministic answer: the zeta initializer prepares the startup state.", { exact: true })).toBeVisible({ timeout: 30_000 });
@@ -73,7 +73,7 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await page.getByLabel("Your OpenAI API key").fill("e2e-only-test-key");
 
   await page.getByRole("button", { name: "Illustrate" }).click();
-  await page.getByLabel("Message").fill("Illustrate the zeta initializer startup sequence in src/app.py.");
+  await page.getByLabel("Message", { exact: true }).fill("Illustrate the zeta initializer startup sequence in src/app.py.");
   await page.getByRole("button", { name: "Send message" }).click();
   const illustration = page.locator("figure.bot-illustration");
   await expect(illustration).toBeVisible({ timeout: 60_000 });
@@ -119,7 +119,7 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await page.getByRole("button", { name: "New conversation" }).click();
   await expect(page.getByText("Start a conversation")).toBeVisible();
   await page.getByLabel("Your OpenAI API key").fill("e2e-only-test-key");
-  const secondComposer = page.getByLabel("Message");
+  const secondComposer = page.getByLabel("Message", { exact: true });
   await secondComposer.fill("SECOND_BOT_MARKER: explain zeta initializer from src/app.py");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Deterministic answer for SECOND_BOT_MARKER.", { exact: true })).toBeVisible({ timeout: 30_000 });
@@ -144,3 +144,4 @@ async function createBot(
   await page.getByLabel("OpenAI model ID").fill(model);
   await page.getByRole("button", { name: "Create bot" }).click();
 }
+
