@@ -41,8 +41,8 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   const repoOne = `${storageDir}/e2e-fixtures/${runId}/repo-one`;
   await page.getByRole("link", { name: "Bots" }).click();
   await createBot(page, repoOne, "repo-one", "E2E Repo One", "e2e-browser-model");
-  const firstBotUrl = page.url();
   await expect(page.getByRole("heading", { name: "E2E Repo One", level: 1 })).toBeVisible({ timeout: 180_000 });
+  const firstBotUrl = page.url();
 
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("E2E Repo One Updated");
@@ -111,8 +111,8 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   const repoTwo = `${storageDir}/e2e-fixtures/${runId}/repo-two`;
   await page.getByRole("button", { name: "Back to bots" }).click();
   await createBot(page, repoTwo, "repo-two", "E2E Repo Two", "e2e-browser-model");
-  const secondBotUrl = page.url();
   await expect(page.getByRole("heading", { name: "E2E Repo Two", level: 1 })).toBeVisible({ timeout: 180_000 });
+  const secondBotUrl = page.url();
   await expect(page.getByText("Your conversations will appear here.")).toBeVisible();
   await expect(page.getByText("Deterministic answer: the zeta initializer prepares the startup state.", { exact: true })).toHaveCount(0);
 
