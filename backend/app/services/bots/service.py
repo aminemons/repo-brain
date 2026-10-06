@@ -21,6 +21,7 @@ from backend.app.database import CodeWikiStore, get_store
 from backend.app.models.base import Base
 from backend.app.schemas.bots import (
     Bot,
+    BotIllustration,
     BotMessage,
     BotRefreshResponse,
     BotSource,
@@ -30,6 +31,11 @@ from backend.app.schemas.bots import (
 from backend.app.schemas.project_brain import IngestDocumentRequest
 from backend.app.services.analyzer import AnalysisService
 from backend.app.services.async_tasks import repo_write_lock
+from backend.app.services.bots.illustration import (
+    IllustrationUnavailable,
+    NajmIllustrationService,
+    build_evidence_map,
+)
 from backend.app.services.bots.models import BotConversationRecord, BotMessageRecord, BotRecord
 from backend.app.services.graphrag import GraphRAGRetriever
 from backend.app.services.project_brain.service import ProjectBrainService
@@ -226,6 +232,7 @@ class BotService:
                     content=row.content,
                     created_at=row.created_at,
                     sources=[BotSource.model_validate(item) for item in row.sources],
+                    illustration=self._illustration_metadata(bot_id, row.id),
                 )
                 for row in records
             ]
@@ -272,25 +279,18 @@ class BotService:
         user_message = redact_source_text(message.strip())
         if not user_message:
             raise ValueError("Message is required")
+        request_created_at = _now()
 
-        now = _now()
-        user_record = BotMessageRecord(
-            id=str(uuid4()),
-            conversation_id=conversation_id,
-            role="user",
-            content=user_message,
-            sources=[],
-            created_at=now,
-        )
-        with self.store.orm_session() as session:
-            session.add(user_record)
-            row = session.get(BotConversationRecord, conversation_id)
-            if row is not None and row.bot_id == bot.id:
-                row.updated_at = now
-
-        sources = await asyncio.to_thread(
-            asyncio.run, self._retrieve_sources(bot.repo_id, user_message)
-        )
+        try:
+            sources = await asyncio.to_thread(
+                asyncio.run, self._retrieve_sources(bot.repo_id, user_message)
+            )
+        except Exception:  # noqa: BLE001 - index failures must not expose backend diagnostics
+            # Keep index diagnostics safe and leave the conversation unchanged on failure.
+            raise BotProviderError(
+                503,
+                "Repository evidence is unavailable. Refresh the bot index and verify the repository, then try again.",
+            ) from None
         evidence = _format_evidence(sources)
         instructions = _system_instructions(bot.instructions, mode)
         model_input: list[EasyInputMessageParam] = []
@@ -348,7 +348,54 @@ class BotService:
             sources=[source.model_dump() for source in sources],
             created_at=_now(),
         )
+
+        illustration: BotIllustration | None = None
+        if mode == "illustrate":
+            illustration_service = NajmIllustrationService(self.settings)
+            def unavailable(reason: str) -> dict[str, str | None]:
+                try:
+                    return illustration_service.record_unavailable(
+                        bot.repo_id, bot.id, answer_record.id, reason
+                    )
+                except (OSError, ValueError):
+                    return {
+                        "status": "unavailable", "url": None,
+                        "caption": "Illustration unavailable.",
+                        "alt_text": "No illustration is available.",
+                        "detail": "The illustration could not be created.",
+                    }
+
+            try:
+                if not sources:
+                    illustration_data = unavailable("insufficient_evidence")
+                else:
+                    graph_nodes, graph_edges = await asyncio.to_thread(self.store.get_graph, bot.repo_id)
+                    plan, evidence_ids = build_evidence_map(
+                        user_message, sources, graph_nodes, graph_edges
+                    )
+                    repo = self._repo(bot.repo_id)
+                    commit = read_repo_metadata(bot.repo_id, settings=self.settings)
+                    repo_commit = commit.commit_hash if commit is not None else repo.commit_hash
+                    illustration_data = await illustration_service.render(
+                        repo_id=bot.repo_id,
+                        bot_id=bot.id,
+                        message_id=answer_record.id,
+                        repo_commit=repo_commit,
+                        plan=plan,
+                        evidence_ids=evidence_ids,
+                    )
+            except IllustrationUnavailable as exc:
+                illustration_data = unavailable(str(exc))
+            except Exception:  # noqa: BLE001 - renderer/storage failures preserve the answer
+                illustration_data = unavailable("renderer_unavailable")
+            illustration = BotIllustration.model_validate(illustration_data)
+
+        user_record = BotMessageRecord(
+            id=str(uuid4()), conversation_id=conversation_id, role="user",
+            content=user_message, sources=[], created_at=request_created_at,
+        )
         with self.store.orm_session() as session:
+            session.add(user_record)
             session.add(answer_record)
             row = session.get(BotConversationRecord, conversation_id)
             if row is not None and row.bot_id == bot.id:
@@ -360,7 +407,29 @@ class BotService:
             content=answer,
             created_at=answer_record.created_at,
             sources=sources,
+            illustration=illustration,
         )
+
+    def illustration_bytes(self, bot_id: str, message_id: str) -> bytes:
+        bot = self.get_bot(bot_id)
+        with self.store.orm_session() as session:
+            record = session.scalar(
+                select(BotMessageRecord)
+                .join(BotConversationRecord, BotConversationRecord.id == BotMessageRecord.conversation_id)
+                .where(
+                    BotConversationRecord.bot_id == bot_id,
+                    BotMessageRecord.id == message_id,
+                    BotMessageRecord.role == "assistant",
+                )
+            )
+            if record is None:
+                raise ValueError("Illustration not found")
+        return NajmIllustrationService(self.settings).read(bot.repo_id, bot_id, message_id)
+
+    def _illustration_metadata(self, bot_id: str, message_id: str) -> BotIllustration | None:
+        bot = self.get_bot(bot_id)
+        metadata = NajmIllustrationService(self.settings).metadata(bot.repo_id, bot_id, message_id)
+        return BotIllustration.model_validate(metadata) if metadata is not None else None
 
     async def refresh(self, bot_id: str) -> BotRefreshResponse:
         bot = self.get_bot(bot_id)

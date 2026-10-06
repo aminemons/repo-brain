@@ -62,6 +62,15 @@ class BotMessage(BaseModel):
     content: str
     created_at: str
     sources: list[BotSource] = Field(default_factory=list)
+    illustration: "BotIllustration | None" = None
+
+
+class BotIllustration(BaseModel):
+    status: Literal["ready", "unavailable"]
+    url: str | None = None
+    caption: str
+    alt_text: str
+    detail: str | None = None
 
 
 class ConversationDetail(BaseModel):
@@ -71,7 +80,7 @@ class ConversationDetail(BaseModel):
 
 class BotMessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12_000)
-    mode: Literal["explain", "teach"] = "explain"
+    mode: Literal["explain", "teach", "illustrate"] = "explain"
     api_key: SecretStr = Field(min_length=1, max_length=512)
 
 

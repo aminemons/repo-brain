@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     bot_documentation_watch_enabled: bool = True
     bot_documentation_watch_seconds: int = Field(default=60, ge=15, le=86400)
     bot_github_sync_enabled: bool = True
+    najm_enabled: bool = False
+    najm_endpoint: str = "http://najm:8080"
+    najm_timeout_seconds: float = Field(default=20.0, ge=1, le=120)
 
     llm: LLMSettings = Field(default_factory=LLMSettings)
 

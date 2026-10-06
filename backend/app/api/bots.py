@@ -146,8 +146,21 @@ async def send_message(
         raise _http_error(exc) from exc
     except BotProviderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from None
-    except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from None
+    except RuntimeError:
+        raise HTTPException(status_code=502, detail="The assistant could not complete this request. Try again.") from None
+
+
+@router.get("/{bot_id}/messages/{message_id}/illustration")
+async def get_illustration(bot_id: str, message_id: str, service: BotServiceDep) -> Response:
+    try:
+        image = await run_blocking(service.illustration_bytes, bot_id, message_id)
+    except ValueError as exc:
+        raise _http_error(exc) from exc
+    return Response(
+        content=image,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store", "Content-Disposition": "inline"},
+    )
 
 
 @router.post("/{bot_id}/refresh", response_model=BotRefreshResponse)
