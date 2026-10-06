@@ -127,6 +127,7 @@ internal static class Program
                 positions.Add(graph.Nodes[i].Id, position);
             }
 
+            var edgeLabels = new List<TextNode>();
             foreach (var edge in graph.Edges)
             {
                 var start = positions[edge.Source] + new Vector2(195, 167);
@@ -136,7 +137,10 @@ internal static class Program
                     end,
                     Edge));
                 var midpoint = (start + end) * 0.5f;
-                layer.Root.Add(new TextNode(Typeset(edge.Label, 15), midpoint + new Vector2(8, -8), Color.White, 340, 30));
+                var label = Typeset(edge.Label, 15);
+                edgeLabels.Add(new TextNode(label,
+                    midpoint + new Vector2(-label.LogicalBounds.Width * 0.5f, -8),
+                    Color.White, Math.Max(label.LogicalBounds.Width, 1), 30));
             }
 
             foreach (var node in graph.Nodes)
@@ -150,6 +154,8 @@ internal static class Program
                 layer.Root.Add(new TextNode(label, positions[node.Id] + new Vector2(22, 94), Color.White, 350, 110));
                 layer.Root.Add(new TextNode(source, positions[node.Id] + new Vector2(22, 210), new Color(0.63f, 0.7f, 0.79f), 350, 110));
             }
+            foreach (var label in edgeLabels)
+                layer.Root.Add(label);
         }
 
         private ITextLayout Typeset(string text, float size) =>
