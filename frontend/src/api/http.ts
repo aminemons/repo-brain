@@ -3,6 +3,13 @@ import { AUTH_REQUIRED_EVENT, readAccessToken } from "./auth";
 export const API_BASE = "/api";
 export const API_UNREACHABLE_EVENT = "project-brain:api-unreachable";
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   const token = readAccessToken();
@@ -33,10 +40,10 @@ export async function readJson<T>(response: Response, label: string): Promise<T>
   const contentType = response.headers.get("content-type") ?? "";
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("The API access token is missing or was rejected. Open Settings to enter your token.");
+      throw new ApiError("The API access token is missing or was rejected. Open Settings to enter your token.", 401);
     }
     const detail = await readErrorDetail(response, contentType);
-    throw new Error(`${label} failed: ${response.status}${detail ? ` - ${detail}` : ""}`);
+    throw new ApiError(`${label} failed: ${response.status}${detail ? ` - ${detail}` : ""}`, response.status);
   }
   if (!isJsonResponse(contentType)) {
     const preview = await readTextPreview(response);

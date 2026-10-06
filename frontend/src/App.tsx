@@ -3,6 +3,7 @@ import {
   BrainCircuit,
   FolderGit2,
   GitBranch,
+  LoaderCircle,
   MessageCircleQuestion,
   MessagesSquare,
   Moon,
@@ -10,20 +11,21 @@ import {
   Settings,
   Sun
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 
 import { AUTH_REQUIRED_EVENT, TOKEN_CHANGED_EVENT, readAccessToken } from "./api/auth";
-import { API_UNREACHABLE_EVENT } from "./api/http";
+import { API_UNREACHABLE_EVENT, ApiError } from "./api/http";
 import { getHealth } from "./api/repos";
 import { getLlmModels } from "./api/settings";
-import { AskPage } from "./pages/AskPage";
-import { BrainPage } from "./pages/BrainPage";
 import { BotPage } from "./pages/BotPage";
 import { BotsPage } from "./pages/BotsPage";
-import { GraphPage } from "./pages/GraphPage";
-import { ReposPage } from "./pages/ReposPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { WikiPage } from "./pages/WikiPage";
+
+const AskPage = lazy(() => import("./pages/AskPage").then((module) => ({ default: module.AskPage })));
+const BrainPage = lazy(() => import("./pages/BrainPage").then((module) => ({ default: module.BrainPage })));
+const GraphPage = lazy(() => import("./pages/GraphPage").then((module) => ({ default: module.GraphPage })));
+const ReposPage = lazy(() => import("./pages/ReposPage").then((module) => ({ default: module.ReposPage })));
+const WikiPage = lazy(() => import("./pages/WikiPage").then((module) => ({ default: module.WikiPage })));
 
 export type WorkspaceSection = "repos" | "graph" | "wiki" | "ask" | "brain" | "bots" | "settings";
 type ThemeMode = "dark" | "light";
@@ -54,8 +56,7 @@ export function App() {
       return true;
     } catch (error) {
       if (revision === apiCheckRevisionRef.current) {
-        const message = error instanceof Error ? error.message : "";
-        setApiStatus(/\b401\b|access token is missing|token was rejected/i.test(message) ? "auth-required" : "offline");
+        setApiStatus(isUnauthorizedError(error) ? "auth-required" : "offline");
       }
       return false;
     } finally {
@@ -77,8 +78,7 @@ export function App() {
         setTokenMessage(readAccessToken() ? "Access token accepted for this session." : "This service does not require an access token.");
       }).catch((error: unknown) => {
         if (revision !== tokenCheckRevisionRef.current || validationRevision !== tokenValidationRevisionRef.current) return;
-        const message = error instanceof Error ? error.message : "";
-        setTokenMessage(/\b401\b/.test(message)
+        setTokenMessage(isUnauthorizedError(error)
           ? "Access token rejected. Check it and retry."
           : "Could not verify access token because the service connection failed. Check the connection and retry.");
       });
@@ -262,36 +262,44 @@ export function App() {
         ) : null}
 
       <section key={tokenRevision} className={`workspace is-section-${activeSection}`}>
-        {activeSection !== "bots" ? (
-          <GraphPage
-            selectedRepoId={selectedRepoId}
-            onSelectedRepoChange={handleSelectedRepoChange}
-            isActiveSection={activeSection === "graph"}
-          />
+        {activeSection === "graph" ? (
+          <Suspense fallback={<PageLoadingFallback />}>
+            <GraphPage
+              selectedRepoId={selectedRepoId}
+              onSelectedRepoChange={handleSelectedRepoChange}
+              isActiveSection
+            />
+          </Suspense>
         ) : null}
         {activeSection !== "graph" ? (
           <aside className="assistant-rail">
             {activeSection === "repos" ? (
-              <ReposPage
-                selectedRepoId={selectedRepoId}
-                onRepoChange={handleSelectedRepoChange}
-                onOpenRepo={openRepoSection}
-                isActiveSection
-              />
+              <Suspense fallback={<PageLoadingFallback />}>
+                <ReposPage
+                  selectedRepoId={selectedRepoId}
+                  onRepoChange={handleSelectedRepoChange}
+                  onOpenRepo={openRepoSection}
+                  isActiveSection
+                />
+              </Suspense>
             ) : null}
             {activeSection === "wiki" ? (
-              <WikiPage
-                selectedRepoId={selectedRepoId}
-                onRepoChange={handleSelectedRepoChange}
-                isActiveSection
-              />
+              <Suspense fallback={<PageLoadingFallback />}>
+                <WikiPage
+                  selectedRepoId={selectedRepoId}
+                  onRepoChange={handleSelectedRepoChange}
+                  isActiveSection
+                />
+              </Suspense>
             ) : null}
             {activeSection === "ask" ? (
-              <AskPage
-                selectedRepoId={selectedRepoId}
-                onRepoChange={handleSelectedRepoChange}
-                isActiveSection={activeSection === "ask"}
-              />
+              <Suspense fallback={<PageLoadingFallback />}>
+                <AskPage
+                  selectedRepoId={selectedRepoId}
+                  onRepoChange={handleSelectedRepoChange}
+                  isActiveSection
+                />
+              </Suspense>
             ) : null}
             {activeSection === "settings" ? (
               <SettingsPage
@@ -301,7 +309,9 @@ export function App() {
               />
             ) : null}
             {activeSection === "brain" ? (
-              <BrainPage selectedRepoId={selectedRepoId} onRepoChange={handleSelectedRepoChange} />
+              <Suspense fallback={<PageLoadingFallback />}>
+                <BrainPage selectedRepoId={selectedRepoId} onRepoChange={handleSelectedRepoChange} />
+              </Suspense>
             ) : null}
             {activeSection === "bots" ? (
               activeBotId ? (
@@ -319,6 +329,19 @@ export function App() {
       </div>
     </main>
   );
+}
+
+function PageLoadingFallback() {
+  return (
+    <div className="app-page-loading" role="status" aria-live="polite">
+      <LoaderCircle size={16} aria-hidden="true" />
+      <span>Loading workspace…</span>
+    </div>
+  );
+}
+
+function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401;
 }
 
 function readStoredTheme(): ThemeMode {
