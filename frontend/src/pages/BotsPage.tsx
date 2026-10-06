@@ -1,5 +1,5 @@
 import { ChevronRight, FileCode2, FolderGit2, Plus, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { createBot, getBots, refreshBotKnowledge, type Bot } from "../api/bots";
 import { createRepo } from "../api/repos";
@@ -25,6 +25,9 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
   const [createError, setCreateError] = useState<string | null>(null);
   const [createdBotId, setCreatedBotId] = useState<string | null>(null);
   const [createNotice, setCreateNotice] = useState<string | null>(null);
+  const createAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => createAbortRef.current?.abort(), []);
 
   const refresh = useCallback((signal?: AbortSignal) => {
     setLoadingBots(true);
@@ -70,10 +73,16 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
     setCreateNotice(null);
     setCreatedBotId(null);
     let selectedRepoId = repoId;
+    let addedRepoName = "";
+    const controller = new AbortController();
+    createAbortRef.current?.abort();
+    createAbortRef.current = controller;
     try {
       if (addRepository) {
-        const repo = await createRepo({ path: repoPath.trim(), name: repoDisplayName.trim() || undefined });
+        const repo = await createRepo({ path: repoPath.trim(), name: repoDisplayName.trim() || undefined }, controller.signal);
+        if (controller.signal.aborted) return;
         selectedRepoId = repo.id;
+        addedRepoName = repo.name;
         setRepoId(repo.id);
         setRepoPath("");
         setRepoDisplayName("");
@@ -87,7 +96,8 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
         name: name.trim(),
         instructions: instructions.trim() || undefined,
         model: model.trim()
-      });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
       setBots((existing) => [bot, ...existing]);
       setCreatedBotId(bot.id);
       setName("");
@@ -96,18 +106,26 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
       setStage("index");
       setCreateNotice("Bot created. Preparing its code and documentation index…");
       try {
-        await refreshBotKnowledge(bot.id);
+        await refreshBotKnowledge(bot.id, controller.signal);
+        if (controller.signal.aborted) return;
         onOpenBot(bot.id);
       } catch (refreshError) {
+        if (controller.signal.aborted) return;
         setCreateError(`The bot was created, but its first knowledge refresh failed. Open the bot and retry Refresh knowledge. ${refreshError instanceof Error ? refreshError.message : ""}`.trim());
         setCreateNotice(null);
       }
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : "Could not create the bot.");
+      if (controller.signal.aborted) return;
+      const failure = error instanceof Error ? error.message : "Could not create the bot.";
+      setCreateError(addedRepoName
+        ? `Repository “${addedRepoName}” was added, but bot creation failed. It is selected below, so you can retry without adding the repository again. ${failure}`
+        : failure);
       if (addRepository) refreshRepos();
     } finally {
-      setCreating(false);
-      setStage("idle");
+      if (!controller.signal.aborted) {
+        setCreating(false);
+        setStage("idle");
+      }
     }
   };
 
@@ -125,7 +143,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
           <h1>Repository bots</h1>
           <p>One bot per repository. Each keeps its own instructions and conversation history.</p>
         </div>
-        <button type="button" className="button button-secondary" disabled={loadingBots} onClick={() => void refresh()} aria-label="Refresh bot list">
+        <button type="button" className="button button-secondary" disabled={loadingBots || creating} onClick={() => void refresh()} aria-label="Refresh bot list">
           <RefreshCw size={14} />Refresh list
         </button>
       </header>
@@ -164,7 +182,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
             ) : (
               <div className="bot-source-setup">
                 <div className="bot-source-setup-title"><FolderGit2 size={15} /><strong>Add repository</strong></div>
-                <label className="field"><span>Local folder or Git URL</span><input value={repoPath} onChange={(event) => setRepoPath(event.target.value)} placeholder="C:\\work\\service or https://github.com/team/service.git" required /></label>
+                <label className="field"><span>Local folder or Git URL</span><input value={repoPath} onChange={(event) => setRepoPath(event.target.value)} placeholder="https://github.com/team/service.git" required /><small className="field-help">A local folder path refers to the Repo Brain server's disk, not your PC.</small></label>
                 <label className="field"><span>Display name <small>Optional</small></span><input value={repoDisplayName} onChange={(event) => setRepoDisplayName(event.target.value)} placeholder="service" /></label>
               </div>
             )}

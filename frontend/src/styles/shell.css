@@ -26,6 +26,7 @@
 .app-offline-banner span { color: var(--color-text-secondary); }
 .app-offline-banner button { background: transparent; border: 1px solid var(--color-danger-text); border-radius: 4px; color: var(--color-danger-text); cursor: pointer; font-size: 10px; margin-left: auto; padding: 4px 8px; }
 .app-offline-banner button:disabled { cursor: wait; opacity: .6; }
+.app-token-status { background: var(--color-accent-fill); border-bottom: 1px solid var(--color-border-subtle); color: var(--color-text-secondary); font-size: 11px; line-height: 1.4; padding: 7px 16px; }
 
 .brand-block { align-items: center; display: flex; gap: 11px; min-width: 0; padding: 0 5px; }
 .brand-mark { align-items: center; background: var(--color-accent-fill); border: 1px solid var(--color-border-medium); border-radius: 7px; color: var(--color-accent); display: inline-flex; flex: 0 0 auto; height: 34px; justify-content: center; width: 34px; }
@@ -46,6 +47,8 @@
 .api-connectivity.is-online .status-dot { background: var(--color-success); }
 .api-connectivity.is-offline { color: var(--color-danger-text); }
 .api-connectivity.is-offline .status-dot { background: var(--color-danger-text); }
+.api-connectivity.is-auth-required { color: var(--color-danger-text); }
+.api-connectivity.is-auth-required .status-dot { background: var(--color-danger-text); }
 .api-connectivity button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; margin-left: auto; padding: 2px 3px; text-decoration: underline; }
 .api-connectivity button:disabled { cursor: wait; opacity: .6; }
 

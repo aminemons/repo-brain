@@ -110,9 +110,10 @@ export async function getBotConversations(botId: string, signal?: AbortSignal): 
   return readJson(response, "Conversation list");
 }
 
-export async function createBotConversation(botId: string, title?: string): Promise<BotConversation> {
+export async function createBotConversation(botId: string, title?: string, signal?: AbortSignal): Promise<BotConversation> {
   const response = await apiFetch(`${botsUrl}/${encodeURIComponent(botId)}/conversations`, {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(title ? { title } : {})
   });
@@ -211,18 +212,18 @@ export async function proposeBotChange(
   return readJson(response, "Change proposal");
 }
 
-export async function applyBotChange(botId: string, changeId: string): Promise<BotChange> {
+export async function applyBotChange(botId: string, changeId: string, signal?: AbortSignal): Promise<BotChange> {
   const response = await apiFetch(
     `${botsUrl}/${encodeURIComponent(botId)}/changes/${encodeURIComponent(changeId)}/apply`,
-    { method: "POST" }
+    { method: "POST", signal }
   );
   return readJson(response, "Change apply");
 }
 
-export async function publishBotChange(botId: string, changeId: string): Promise<BotChange> {
+export async function publishBotChange(botId: string, changeId: string, signal?: AbortSignal): Promise<BotChange> {
   const response = await apiFetch(
     `${botsUrl}/${encodeURIComponent(botId)}/changes/${encodeURIComponent(changeId)}/publish`,
-    { method: "POST" }
+    { method: "POST", signal }
   );
   return readJson(response, "Change publish");
 }
@@ -235,8 +236,8 @@ export async function getBotDocumentationStatus(
   return readJson(response, "Documentation status");
 }
 
-export async function checkBotDocumentation(botId: string): Promise<BotDocumentationStatus & { queued_count?: number }> {
-  const response = await apiFetch(`${botsUrl}/${encodeURIComponent(botId)}/documentation/check`, { method: "POST" });
+export async function checkBotDocumentation(botId: string, signal?: AbortSignal): Promise<BotDocumentationStatus & { queued_count?: number }> {
+  const response = await apiFetch(`${botsUrl}/${encodeURIComponent(botId)}/documentation/check`, { method: "POST", signal });
   return readJson(response, "Documentation check");
 }
 

@@ -17,9 +17,10 @@ export async function getRepos(signal?: AbortSignal): Promise<RepoSummary[]> {
   return readJson(response, "Repository list");
 }
 
-export async function createRepo(payload: CreateRepoPayload): Promise<RepoSummary> {
+export async function createRepo(payload: CreateRepoPayload, signal?: AbortSignal): Promise<RepoSummary> {
   const response = await apiFetch(`${API_BASE}/repos`, {
     method: "POST",
+    signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });

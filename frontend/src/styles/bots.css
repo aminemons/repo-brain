@@ -151,6 +151,7 @@
 .bot-key-field > span { align-items: center; color: var(--color-text-secondary); display: flex; font-size: 12px; font-weight: 600; gap: 5px; }
 .bot-composer input { font-size: 13px; min-height: 36px; padding: 6px 8px; }
 .bot-data-note { color: var(--color-text-muted); font-size: 12px; line-height: 1.4; margin: 6px 0 8px; max-width: 78ch; }
+.bot-key-prompt { color: var(--color-accent-strong); font-size: 12px; line-height: 1.45; margin: 7px 0 0; }
 .bot-compose-row { align-items: end; display: flex; gap: 9px; }
 .bot-compose-row textarea { min-height: 56px; }
 .bots-primary-button { align-items: center; background: var(--color-accent); border: 1px solid var(--color-accent); border-radius: 5px; color: #fff; cursor: pointer; display: inline-flex; font-size: 12px; font-weight: 650; gap: 7px; justify-content: center; min-height: 35px; padding: 8px 11px; }
@@ -160,6 +161,7 @@
 
 .bot-tool-panel { margin: 0 auto; max-width: 900px; overflow: auto; padding: 22px clamp(14px, 3vw, 28px); width: 100%; }
 .bot-tool-title { align-items: center; display: flex; justify-content: space-between; margin-bottom: 9px; }
+.bot-tool-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
 .bot-review-badge { background: var(--color-soft-fill); color: var(--color-text-secondary); font-size: 12px; padding: 5px 7px; }
 .bot-tool-panel > p { color: var(--color-text-secondary); font-size: 12px; line-height: 1.55; margin: 0 0 14px; max-width: 75ch; }
 .bot-change-form { background: var(--color-surface); border: 1px solid var(--color-border-subtle); margin: 15px 0; padding: 12px; }
@@ -232,6 +234,8 @@
   .bot-doc-summary div,.bot-doc-summary div:last-child { border-bottom: 0; border-right: 1px solid var(--color-border-subtle); }
   .bot-doc-summary div:last-child { border-bottom: 1px solid var(--color-border-subtle); }
   .bot-change-header { flex-direction: column; }
+  .bot-tool-title { align-items: flex-start; gap: 9px; }
+  .bot-tool-actions { justify-content: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) {
   .is-spinning,.bot-spinner { animation: none; }

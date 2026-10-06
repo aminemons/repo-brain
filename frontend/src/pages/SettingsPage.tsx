@@ -28,18 +28,13 @@ export function SettingsPage({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([getLlmModels(), getHealth()])
-      .then(([modelData, healthData]) => {
-        if (cancelled) {
-          return;
-        }
-        setModels(modelData);
-        setHealth(healthData.status);
-      })
-      .catch((apiError: unknown) => {
-        if (!cancelled) {
-          setError(apiError instanceof Error ? apiError.message : "Failed to load settings");
-        }
+    Promise.allSettled([getLlmModels(), getHealth()])
+      .then(([modelResult, healthResult]) => {
+        if (cancelled) return;
+        if (modelResult.status === "fulfilled") setModels(modelResult.value);
+        else setError(modelResult.reason instanceof Error ? modelResult.reason.message : "Could not load model settings.");
+        if (healthResult.status === "fulfilled") setHealth(healthResult.value.status);
+        else if (modelResult.status === "fulfilled") setError(healthResult.reason instanceof Error ? healthResult.reason.message : "Could not check service access.");
       })
       .finally(() => {
         if (!cancelled) {
@@ -97,7 +92,7 @@ export function SettingsPage({
           <KeyRound size={16} />
           <h3>API access</h3>
         </header>
-        <p className="brain-muted">Enter the access token configured by your administrator. It is kept for this browser tab's session.</p>
+        <p className="brain-muted">Enter the access token configured by your administrator. It stays in this tab's session and survives a page reload.</p>
         <form className="brain-token-form" onSubmit={updateToken}>
           <label className="field">
             <span>Access token</span>
@@ -107,6 +102,7 @@ export function SettingsPage({
               value={accessToken}
               onChange={(event) => setAccessToken(event.target.value)}
               placeholder="API access token"
+              aria-label="Access token"
             />
           </label>
           <button className="brain-button" type="submit">Save token</button>

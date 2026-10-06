@@ -10,11 +10,12 @@ import {
   Settings,
   Sun
 } from "lucide-react";
-import { useCallback, useEffect, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 
-import { AUTH_REQUIRED_EVENT, TOKEN_CHANGED_EVENT } from "./api/auth";
+import { AUTH_REQUIRED_EVENT, TOKEN_CHANGED_EVENT, readAccessToken } from "./api/auth";
 import { API_UNREACHABLE_EVENT } from "./api/http";
 import { getHealth } from "./api/repos";
+import { getLlmModels } from "./api/settings";
 import { AskPage } from "./pages/AskPage";
 import { BrainPage } from "./pages/BrainPage";
 import { BotPage } from "./pages/BotPage";
@@ -36,19 +37,29 @@ export function App() {
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [authRequired, setAuthRequired] = useState(false);
   const [tokenRevision, setTokenRevision] = useState(0);
-  const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline">("checking");
+  const [apiStatus, setApiStatus] = useState<"checking" | "online" | "offline" | "auth-required">("checking");
   const [apiChecking, setApiChecking] = useState(false);
+  const [tokenMessage, setTokenMessage] = useState<string | null>(null);
+  const apiCheckRevisionRef = useRef(0);
+  const tokenCheckRevisionRef = useRef(0);
+  const tokenValidationRevisionRef = useRef(0);
 
   const checkApi = useCallback(async () => {
+    const revision = ++apiCheckRevisionRef.current;
     setApiChecking(true);
     setApiStatus("checking");
     try {
       await getHealth();
-      setApiStatus("online");
-    } catch {
-      setApiStatus("offline");
+      if (revision === apiCheckRevisionRef.current) setApiStatus("online");
+      return true;
+    } catch (error) {
+      if (revision === apiCheckRevisionRef.current) {
+        const message = error instanceof Error ? error.message : "";
+        setApiStatus(/\b401\b|access token is missing|token was rejected/i.test(message) ? "auth-required" : "offline");
+      }
+      return false;
     } finally {
-      setApiChecking(false);
+      if (revision === apiCheckRevisionRef.current) setApiChecking(false);
     }
   }, []);
 
@@ -58,6 +69,20 @@ export function App() {
     const tokenChanged = () => {
       setAuthRequired(false);
       setTokenRevision((value) => value + 1);
+      setTokenMessage("Checking the updated access token…");
+      const revision = ++tokenCheckRevisionRef.current;
+      const validationRevision = ++tokenValidationRevisionRef.current;
+      void getLlmModels().then(() => {
+        if (revision !== tokenCheckRevisionRef.current || validationRevision !== tokenValidationRevisionRef.current) return;
+        setTokenMessage(readAccessToken() ? "Access token accepted for this session." : "This service does not require an access token.");
+      }).catch((error: unknown) => {
+        if (revision !== tokenCheckRevisionRef.current || validationRevision !== tokenValidationRevisionRef.current) return;
+        const message = error instanceof Error ? error.message : "";
+        setTokenMessage(/\b401\b/.test(message)
+          ? "Access token rejected. Check it and retry."
+          : "Could not verify access token because the service connection failed. Check the connection and retry.");
+      });
+      void checkApi();
     };
     window.addEventListener(AUTH_REQUIRED_EVENT, requireToken);
     window.addEventListener(TOKEN_CHANGED_EVENT, tokenChanged);
@@ -67,7 +92,7 @@ export function App() {
       window.removeEventListener(TOKEN_CHANGED_EVENT, tokenChanged);
       window.removeEventListener(API_UNREACHABLE_EVENT, unreachable);
     };
-  }, []);
+  }, [checkApi]);
 
   useEffect(() => { void checkApi(); }, [checkApi]);
 
@@ -209,7 +234,7 @@ export function App() {
         <div className="app-sidebar-footer">
           <div className={`api-connectivity is-${apiStatus}`} role="status" aria-live="polite">
             <span className="status-dot" />
-            <span>{apiStatus === "online" ? "Service available" : apiStatus === "offline" ? "Service unreachable" : "Checking service…"}</span>
+            <span>{apiStatus === "online" ? "Service available" : apiStatus === "offline" ? "Service unreachable" : apiStatus === "auth-required" ? "Access token needed" : "Checking service…"}</span>
             {apiStatus === "offline" ? <button type="button" disabled={apiChecking} onClick={() => void checkApi()}>{apiChecking ? "Checking…" : "Retry"}</button> : null}
           </div>
           <span>Appearance</span>
@@ -227,10 +252,11 @@ export function App() {
       </aside>
 
       <div className="app-main">
-        {apiStatus === "offline" ? <div className="app-offline-banner" role="alert"><strong>Repo Brain could not reach its service.</strong><span>Check that the app server is running.</span><button type="button" disabled={apiChecking} onClick={() => void checkApi()}>{apiChecking ? "Checking…" : "Retry"}</button></div> : null}
+        {apiStatus === "offline" ? <div className="app-offline-banner" role="alert"><strong>Repo Brain could not reach its service.</strong><span>Check the configured service connection, then retry.</span><button type="button" disabled={apiChecking} onClick={() => void checkApi()}>{apiChecking ? "Checking…" : "Retry"}</button></div> : null}
+        {tokenMessage ? <div className="app-token-status" role="status">{tokenMessage}</div> : null}
         {authRequired ? (
           <div className="brain-auth-alert" role="alert">
-            API access requires a valid token.
+            API access requires a valid token. Save the configured token in Settings to continue.
             <a href={pathForSection("settings", selectedRepoId)} onClick={(event) => navigateToSection(event, "settings")}>Open Settings</a>
           </div>
         ) : null}
