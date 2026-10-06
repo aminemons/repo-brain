@@ -1,9 +1,10 @@
 import hashlib
 import re
+import threading
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, urlunsplit
 
 from backend.app.config import get_settings
 from backend.app.services.language_detector import LanguageDetector
@@ -23,6 +24,8 @@ from backend.app.services.repo_scanner.models import (
 
 GIT_URL_SCHEMES = {"http", "https", "ssh", "git", "file"}
 SCP_LIKE_GIT_URL = re.compile(r"^[A-Za-z0-9_.-]+@[^:]+:.+")
+_clone_guard = threading.Lock()
+_clone_locks: dict[Path, threading.Lock] = {}
 
 
 class RepoScanner:
@@ -45,7 +48,18 @@ class RepoScanner:
 
     def describe(self, path: str, *, name: str | None = None, source_type: str = "local") -> RepoDescriptor:
         requested_path = path.strip()
+        if not requested_path:
+            raise ValueError("Enter a repository URL or a path on the server.")
         if is_git_url(requested_path):
+            parsed = urlparse(requested_path)
+            if parsed.scheme in {"http", "https"} and (parsed.username or parsed.password):
+                raise ValueError("Use a repository URL without embedded credentials. Configure GitHub access on the server.")
+            if (
+                parsed.hostname and parsed.hostname.lower() == "github.com"
+                and parsed.scheme in {"http", "https"}
+                and not re.fullmatch(r"/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/?", parsed.path)
+            ):
+                raise ValueError("Use the GitHub repository URL, such as https://github.com/owner/repository.")
             if get_settings().project_root is not None:
                 raise ValueError("Register the configured local project root; remote clones are disabled.")
             repo_path = self._ensure_git_clone(requested_path)
@@ -65,7 +79,7 @@ class RepoScanner:
             name=name or default_name,
             path=str(repo_path),
             source_type=source_type,
-            git_url=git_url or (requested_path if is_git_url(requested_path) else None),
+            git_url=public_git_url(git_url) or (requested_path if is_git_url(requested_path) else None),
             commit_hash=commit_hash,
         )
 
@@ -175,6 +189,12 @@ class RepoScanner:
 
     def _ensure_git_clone(self, git_url: str) -> Path:
         repo_path = clone_path_for_git_url(git_url, self.storage_dir)
+        with _clone_guard:
+            lock = _clone_locks.setdefault(repo_path, threading.Lock())
+        with lock:
+            return self._clone_under_lock(git_url, repo_path)
+
+    def _clone_under_lock(self, git_url: str, repo_path: Path) -> Path:
         if repo_path.exists():
             if not repo_path.is_dir():
                 raise NotADirectoryError(f"Git clone destination is not a directory: {repo_path}")
@@ -208,7 +228,24 @@ def clone_path_for_git_url(git_url: str, storage_dir: Path | str) -> Path:
 
 
 def normalize_git_url(git_url: str) -> str:
-    return git_url.strip().rstrip("/")
+    text = git_url.strip().rstrip("/")
+    match = re.fullmatch(
+        r"(?:https?://github\.com/|git@github\.com:)([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?",
+        text, re.IGNORECASE,
+    )
+    if match:
+        return f"https://github.com/{match[1].lower()}/{match[2].lower()}"
+    return text
+
+
+def public_git_url(value: str | None) -> str | None:
+    """Repository records and API responses never carry URL credentials."""
+    if not value:
+        return value
+    parsed = urlsplit(value)
+    if parsed.scheme and "@" in parsed.netloc:
+        return urlunsplit(parsed._replace(netloc=parsed.netloc.rpartition("@")[2]))
+    return value
 
 
 def repo_name_from_git_url(git_url: str) -> str:

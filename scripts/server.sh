@@ -14,7 +14,7 @@ case "${1:-status}" in
   status) "${compose[@]}" ps ;;
   logs) "${compose[@]}" logs --tail 100 app najm ;;
   update)
-    git diff --quiet && git diff --cached --quiet || { echo 'Commit or preserve local source changes before updating.' >&2; exit 1; }
+    [[ -z "$(git status --porcelain --untracked-files=all)" ]] || { echo 'Commit or preserve local source changes before updating.' >&2; exit 1; }
     git pull --ff-only
     "${compose[@]}" up --build --detach --wait --wait-timeout 300 ;;
   check)

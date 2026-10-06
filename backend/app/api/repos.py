@@ -1,17 +1,21 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.database import get_store
 from backend.app.services.async_tasks import repo_write_lock, run_blocking
-from backend.app.services.repo_scanner import RepoDescriptor, RepoScanResult, RepoScanner
+from backend.app.services.repo_scanner import RepoDescriptor, RepoScanner, RepoScanResult
+from backend.app.services.repo_scanner.scanner import public_git_url
 
 router = APIRouter()
 
 
 class CreateRepoRequest(BaseModel):
-    path: str
-    name: str | None = None
-    source_type: str = "local"
+    model_config = ConfigDict(str_strip_whitespace=True)
+    path: str = Field(min_length=1, max_length=4096)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    source_type: Literal["local", "git"] = "local"
 
 
 class ScanRepoRequest(CreateRepoRequest):
@@ -57,7 +61,7 @@ async def list_repos() -> list[dict[str, str]]:
             "name": repo.name,
             "path": repo.path,
             "source_type": repo.source_type,
-            "git_url": repo.git_url or "",
+            "git_url": public_git_url(repo.git_url) or "",
             "commit_hash": repo.commit_hash or "",
         }
         for repo in repos
@@ -74,7 +78,7 @@ async def get_repo(repo_id: str) -> dict[str, str]:
         "name": repo.name,
         "path": repo.path,
         "source_type": repo.source_type,
-        "git_url": repo.git_url or "",
+        "git_url": public_git_url(repo.git_url) or "",
         "commit_hash": repo.commit_hash or "",
     }
 
