@@ -79,6 +79,13 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await expect(illustration).toBeVisible({ timeout: 60_000 });
   await expect(illustration.locator("img")).toBeVisible({ timeout: 60_000 });
   await expect(illustration.locator("img")).toHaveAttribute("src", /^blob:/);
+  await expect.poll(() => illustration.locator("img").evaluate(
+    (element) => (element as HTMLImageElement).naturalWidth,
+  )).toBeGreaterThan(0);
+  await expect.poll(() => page.locator(".bot-messages").evaluate(
+    (element) => element.scrollHeight - element.scrollTop - element.clientHeight,
+  )).toBeLessThan(4);
+  await illustration.scrollIntoViewIfNeeded();
   const desktopScreenshot = testInfo.outputPath("e2e-populated-chat-desktop.png");
   await page.screenshot({ path: desktopScreenshot, fullPage: true });
   await testInfo.attach("e2e-populated-chat-desktop.png", {
@@ -87,6 +94,7 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await illustration.scrollIntoViewIfNeeded();
   await expect.poll(() => page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
   )).toBe(true);
