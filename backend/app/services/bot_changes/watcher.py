@@ -18,6 +18,7 @@ from backend.app.services.bot_changes.service import (
     BotChangeService,
     _bot_repo,
     _git_prefix,
+    _github_credentials,
     _run_git,
     _valid_github_remote,
 )
@@ -60,7 +61,7 @@ def _sync_managed_clone(bot_id: str, settings: Settings) -> bool:
     hooks.mkdir(parents=True, exist_ok=True)
     git_prefix = _git_prefix(root, hooks, env)
     result = subprocess.run(
-        [*git_prefix, "fetch", "--no-tags", "origin", refspec],
+        [*git_prefix, *_github_credentials(env), "fetch", "--no-tags", "origin", refspec],
         capture_output=True, text=True, timeout=120, check=False, env=env, shell=False,
     )
     if result.returncode:

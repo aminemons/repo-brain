@@ -141,7 +141,8 @@ def test_propose_apply_uses_isolated_worktree_and_preserves_base_checkout(
         assert "sk-test-one-time-key" not in json.dumps(stored.files)
 
 
-def test_publish_uses_noninteractive_stubbed_git_and_gh(bot_fixture, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("server_token", [False, True])
+def test_publish_uses_noninteractive_stubbed_git_and_gh(bot_fixture, monkeypatch: pytest.MonkeyPatch, server_token: bool) -> None:
     import shutil
 
     from backend.app.services.bot_changes import service as service_module
@@ -154,6 +155,13 @@ def test_publish_uses_noninteractive_stubbed_git_and_gh(bot_fixture, monkeypatch
     service = BotChangeService(bot_fixture.settings)
     proposal = service.propose("fixture-bot", "Change the answer", "sk-test")
     service.apply("fixture-bot", proposal["id"])
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    if server_token:
+        monkeypatch.setenv("GH_TOKEN", "fixture-github-token")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "fixture.untrusted")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "fixture")
     original_run = subprocess.run
     calls: list[list[str]] = []
 
@@ -166,6 +174,10 @@ def test_publish_uses_noninteractive_stubbed_git_and_gh(bot_fixture, monkeypatch
                 returncode=0, stdout="https://github.com/example/fixture/pull/123\n", stderr="",
             )
         if args[0] == "git" and "push" in args:
+            assert "GIT_CONFIG_COUNT" not in kwargs["env"]
+            assert "fixture-github-token" not in " ".join(args)
+            helper = "credential.https://github.com.helper=!gh auth git-credential"
+            assert (helper in args) == server_token
             calls.append(list(args))
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return original_run(args, **kwargs)

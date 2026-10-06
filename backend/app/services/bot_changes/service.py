@@ -54,6 +54,16 @@ def _now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _github_credentials(env: dict[str, str]) -> list[str]:
+    """Use the server's explicit GitHub token after untrusted Git settings are cleared."""
+    if not (env.get("GH_TOKEN") or env.get("GITHUB_TOKEN")):
+        return []
+    return [
+        "-c", "credential.https://github.com.helper=",
+        "-c", "credential.https://github.com.helper=!gh auth git-credential",
+    ]
+
+
 def _lock(bot_id: str) -> threading.RLock:
     with _locks_guard:
         return _bot_locks.setdefault(bot_id, threading.RLock())
@@ -587,7 +597,7 @@ class BotChangeService:
                 url = existing.stdout.strip() if existing.returncode == 0 else ""
                 if not url:
                     push = subprocess.run(
-                        ["git", "-c", f"core.hooksPath={(self.settings.storage_dir / 'bot_changes' / 'disabled-hooks').resolve()}",
+                        ["git", *_github_credentials(env), "-c", f"core.hooksPath={(self.settings.storage_dir / 'bot_changes' / 'disabled-hooks').resolve()}",
                          "-C", str(worktree), "push", "--set-upstream", "origin", snapshot["branch"]],
                         capture_output=True, text=True, timeout=120, check=False, env=env, shell=False,
                     )
