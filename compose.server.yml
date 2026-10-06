@@ -1,0 +1,80 @@
+name: repo-brain
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: repo-brain:server
+    environment:
+      CODEWIKI_APP_NAME: Repo Brain
+      CODEWIKI_DATABASE_URL: sqlite:////app/data/codewiki.sqlite3
+      CODEWIKI_STORAGE_DIR: /app/storage
+      CODEWIKI_AUTH_TOKEN: ${CODEWIKI_AUTH_TOKEN:?Run bash scripts/setup-server.sh to prepare the private environment}
+      CODEWIKI_LOCAL_ONLY: "true"
+      CODEWIKI_PRIVACY_MODE: local_only
+      CODEWIKI_NAJM_ENABLED: "true"
+      CODEWIKI_NAJM_ENDPOINT: http://najm:8080
+      GH_TOKEN: ${GH_TOKEN:-}
+      GH_PROMPT_DISABLED: "1"
+      GIT_TERMINAL_PROMPT: "0"
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: credential.https://github.com.helper
+      GIT_CONFIG_VALUE_0: "!gh auth git-credential"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    volumes:
+      - app-data:/app/data
+      - app-storage:/app/storage
+    networks:
+      - outbound
+      - rendering
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: ${APP_MEMORY_LIMIT:-2g}
+    cpus: ${APP_CPU_LIMIT:-2}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+  najm:
+    build:
+      context: .
+      dockerfile: renderer/Dockerfile
+    image: repo-brain-najm:server
+    expose: ["8080"]
+    networks: [rendering]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 64
+    mem_limit: ${NAJM_MEMORY_LIMIT:-512m}
+    cpus: ${NAJM_CPU_LIMIT:-1}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=128m
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python3, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+networks:
+  outbound:
+  rendering:
+    internal: true
+
+volumes:
+  app-data:
+  app-storage:

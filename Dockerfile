@@ -58,6 +58,7 @@ RUN if [ -n "$APT_MIRROR" ]; then \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         git \
+        gh \
         libpq5 \
         postgresql-client \
     && rm -rf /var/lib/apt/lists/*

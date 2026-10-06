@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 deploy/project-brain.env
+deploy/server.env
 
 __pycache__/
 *.py[cod]

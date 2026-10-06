@@ -1,0 +1,25 @@
+services:
+  app:
+    networks: [outbound, rendering, proxy]
+  caddy:
+    image: caddy:2.10.2-alpine
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN in deploy/server.env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile.server:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [outbound, proxy]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+networks:
+  proxy:
+    internal: true
+volumes:
+  caddy-data:
+  caddy-config:

@@ -24,3 +24,5 @@ storage
 .claude
 *.sqlite3
 *.db
+.run
+deploy/*.env
