@@ -68,3 +68,19 @@ def test_existing_local_origin_is_redacted_in_descriptor(tmp_path: Path, monkeyp
     repo = RepoScanner().describe(str(tmp_path))
     assert repo.git_url == "https://github.com/owner/repo.git"
     assert public_git_url(repo.git_url) == repo.git_url
+
+
+def test_registration_reuses_existing_clone_for_url_alias(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    from backend.app.api import repos
+    from backend.app.services.repo_scanner import RepoDescriptor
+    existing = RepoDescriptor(id="older", name="Saved name", path=str(tmp_path), source_type="git", git_url="https://github.com/owner/repo")
+    monkeypatch.setattr(repos, "get_store", lambda: SimpleNamespace(list_repos=lambda: [existing]))
+    monkeypatch.setattr(GitOperations, "metadata", lambda *_: (existing.git_url, None))
+    def fail(*args, **kwargs):
+        raise AssertionError("Existing clone must be reused")
+    monkeypatch.setattr(GitOperations, "clone", fail)
+    registered = repos._describe_registration(repos.CreateRepoRequest(path="https://github.com/OWNER/REPO.git"))
+    assert registered.path == existing.path
+    assert registered.name == "Saved name"

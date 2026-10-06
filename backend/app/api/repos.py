@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
@@ -6,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.app.database import get_store
 from backend.app.services.async_tasks import repo_write_lock, run_blocking
 from backend.app.services.repo_scanner import RepoDescriptor, RepoScanner, RepoScanResult
-from backend.app.services.repo_scanner.scanner import public_git_url
+from backend.app.services.repo_scanner.scanner import is_git_url, normalize_git_url, public_git_url
 
 router = APIRouter()
 
@@ -24,18 +25,27 @@ class ScanRepoRequest(CreateRepoRequest):
 
 @router.post("")
 async def create_repo(payload: CreateRepoRequest) -> RepoDescriptor:
-    scanner = RepoScanner()
     try:
-        repo = await run_blocking(
-            scanner.describe,
-            payload.path,
-            name=payload.name,
-            source_type=payload.source_type,
-        )
+        repo = await run_blocking(_describe_registration, payload)
     except (FileNotFoundError, NotADirectoryError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     async with repo_write_lock(repo.id):
         return await run_blocking(get_store().upsert_repo, repo)
+
+
+def _describe_registration(payload: CreateRepoRequest) -> RepoDescriptor:
+    """Reuse older managed clones when the owner pastes a different URL spelling."""
+    scanner = RepoScanner()
+    if is_git_url(payload.path):
+        identity = normalize_git_url(payload.path)
+        for existing in get_store().list_repos():
+            if (
+                existing.source_type == "git" and existing.git_url
+                and normalize_git_url(public_git_url(existing.git_url) or "") == identity
+                and Path(existing.path).is_dir()
+            ):
+                return scanner.describe(existing.path, name=payload.name or existing.name, source_type="git")
+    return scanner.describe(payload.path, name=payload.name, source_type=payload.source_type)
 
 
 @router.post("/scan")
