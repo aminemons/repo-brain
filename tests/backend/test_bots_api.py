@@ -171,6 +171,22 @@ def test_bot_first_message_indexes_locally_and_persists_without_key(
             assert calls and calls[0]["store"] is False
             assert calls[0]["max_output_tokens"] == 1600
 
+            separate_conversation = client.post(
+                f"/api/bots/{bot['id']}/conversations", json={"title": "Separate context"}
+            )
+            assert separate_conversation.status_code == 201
+            separate_id = separate_conversation.json()["id"]
+            separate_message = client.post(
+                f"/api/bots/{bot['id']}/conversations/{separate_id}/messages",
+                json={"message": "Fresh conversation question", "api_key": test_key},
+            )
+            assert separate_message.status_code == 200
+            second_request_input = repr(calls[-1]["input"])
+            assert "Where is answer defined?" not in second_request_input
+            assert [item["role"] for item in client.get(
+                f"/api/bots/{bot['id']}/conversations/{separate_id}"
+            ).json()["messages"]] == ["user", "assistant"]
+
             detail = client.get(
                 f"/api/bots/{bot['id']}/conversations/{conversation_id}"
             )
@@ -268,6 +284,68 @@ def test_bot_first_message_indexes_locally_and_persists_without_key(
         database_bytes = (tmp_path / "bots.sqlite3").read_bytes()
         assert test_key.encode() not in database_bytes
         assert test_key.encode() not in (tmp_path / "bots.sqlite3-wal").read_bytes()
+    finally:
+        store = get_store()
+        store.close()
+        get_store.cache_clear()
+        get_settings.cache_clear()
+
+
+def test_bot_owner_access_and_conversation_isolation(tmp_path: Path, monkeypatch) -> None:
+    first_repo = tmp_path / "first-repo"
+    second_repo = tmp_path / "second-repo"
+    first_repo.mkdir()
+    second_repo.mkdir()
+    (first_repo / "main.py").write_text("def first():\n    return 1\n", encoding="utf-8")
+    (second_repo / "main.py").write_text("def second():\n    return 2\n", encoding="utf-8")
+    monkeypatch.setenv("CODEWIKI_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'auth.sqlite3'}")
+    monkeypatch.setenv("CODEWIKI_STORAGE_DIR", str(tmp_path / "storage"))
+    monkeypatch.setenv("CODEWIKI_AUTH_TOKEN", "owner-test-token")
+    monkeypatch.setenv("CODEWIKI_VIEWER_TOKEN", "viewer-test-token")
+    monkeypatch.setenv("CODEWIKI_BOT_DOCUMENTATION_WATCH_ENABLED", "false")
+    get_settings.cache_clear()
+    get_store.cache_clear()
+    owner = {"Authorization": "Bearer owner-test-token"}
+    viewer = {"Authorization": "Bearer viewer-test-token"}
+
+    try:
+        with TestClient(create_app()) as client:
+            denied = client.get("/api/bots")
+            assert denied.status_code == 401
+            assert denied.json()["detail"] == "API access token required. Enter it in Settings."
+            invalid = client.get("/api/bots", headers={"Authorization": "Bearer wrong-token"})
+            assert invalid.status_code == 401
+
+            first = client.post("/api/repos", json={"path": str(first_repo)}, headers=owner)
+            second = client.post("/api/repos", json={"path": str(second_repo)}, headers=owner)
+            assert first.status_code == second.status_code == 200
+            first_bot = client.post(
+                "/api/bots", json={"repo_id": first.json()["id"], "name": "First"}, headers=owner
+            ).json()
+            second_bot = client.post(
+                "/api/bots", json={"repo_id": second.json()["id"], "name": "Second"}, headers=owner
+            ).json()
+            conversation = client.post(
+                f"/api/bots/{first_bot['id']}/conversations", json={"title": "Private"}, headers=owner
+            )
+            assert conversation.status_code == 201
+            conversation_id = conversation.json()["id"]
+
+            assert client.get(f"/api/bots/{first_bot['id']}", headers=viewer).status_code == 200
+            assert client.post(
+                f"/api/bots/{first_bot['id']}/conversations",
+                json={"title": "Viewer cannot write"}, headers=viewer,
+            ).status_code == 403
+            cross_bot_history = client.get(
+                f"/api/bots/{second_bot['id']}/conversations/{conversation_id}", headers=owner
+            )
+            assert cross_bot_history.status_code == 404
+            cross_bot_message = client.post(
+                f"/api/bots/{second_bot['id']}/conversations/{conversation_id}/messages",
+                json={"message": "must not send", "api_key": "sk-test-private"}, headers=owner,
+            )
+            assert cross_bot_message.status_code == 404
+            assert "sk-test-private" not in cross_bot_message.text
     finally:
         store = get_store()
         store.close()

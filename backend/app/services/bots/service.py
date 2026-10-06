@@ -282,9 +282,12 @@ class BotService:
         request_created_at = _now()
 
         try:
-            sources = await asyncio.to_thread(
-                asyncio.run, self._retrieve_sources(bot.repo_id, user_message)
-            )
+            # Lazy analysis and chunk indexing write repo-scoped tables. Share the same
+            # lock as refresh so first chat and refresh cannot build the index together.
+            async with repo_write_lock(bot.repo_id):
+                sources = await asyncio.to_thread(
+                    asyncio.run, self._retrieve_sources(bot.repo_id, user_message)
+                )
         except Exception:  # noqa: BLE001 - index failures must not expose backend diagnostics
             # Keep index diagnostics safe and leave the conversation unchanged on failure.
             raise BotProviderError(
