@@ -1,37 +1,31 @@
 # Najm explanation mode
 
-Status: proposal. No renderer, mode toggle, or execution sandbox has been implemented.
+**Illustrate** adds a static evidence map to a repository bot answer. Explain and Teach remain available, and renderer failures preserve the cited text answer.
 
-## Developer experience
+## What the image means
 
-Add **Illustrate** as an optional choice for a bot question, alongside Explain and Teach. Keep the same repository bot, instructions, conversation, and source evidence. Return the normal cited answer with an additional illustration when rendering succeeds.
+The map shows up to six retrieved source excerpts. Edges appear only when the stored code graph contains a direct, non-inferred relationship between those excerpts. An image is static repository evidence, not an observed runtime trace. Citations remain beside the answer so the developer can inspect the original code.
 
-Start with a call-chain diagram exported to PNG. A short video can highlight steps whose ordering is supported by repository evidence. Keep captions and source links beside the media. Distinguish a possible static path from an observed runtime trace. Each bot's media and manifests must remain scoped to that bot's repository.
+The first version exports PNG. Animation, video, interactive browser scenes, and model-generated C# are outside this implementation.
 
-## Why Najm
+## Integration
 
-[Najm](https://github.com/XMinty77/Najm) provides a C# scene model and rendering primitives for educational visuals. We reviewed commit `6e898a51c7e7e2f0992a194891491fd1253c246e`, including its PNG exporter, Orrery delivery driver, architecture, roadmap, and MIT license.
+Repo Brain owns retrieval, OpenAI requests, bot access, and artifact storage. It creates bounded JSON containing labels, citation references, and verified edges. A separate worker maps that data to a fixed C# scene using [Najm](https://github.com/XMinty77/Najm) and its Skia PNG exporter.
 
-The current source supports a practical first step through exported images and video. Najm is under active development with an unstable public API. Its documented native setup currently targets Linux with .NET 10.0.111 or a later supported patch. Direct browser hosting and vector export must be checked against implementation status before becoming requirements.
+The build fetches and verifies Najm commit `6e898a51c7e7e2f0992a194891491fd1253c246e`. The published .NET 10.0.401 SDK builds the adapter from outside Najm's SDK-pinning directory. The container retains the MIT license and bundled font notices.
 
-## Proposed application boundary
+Rendering runs with a read-only root filesystem, bounded temporary storage, one active render, a 30-second subprocess deadline, and an 8 MiB output limit. The worker's internal network has no outbound access. It receives no repository checkout, model key, or GitHub credential. The server profile enables it; local development leaves it disabled unless configured.
 
-Repo Brain retrieves and checks evidence, builds a bounded explanation plan, and owns bot access, model requests, provenance, and cache invalidation. A separate adapter maps validated plan data to reviewed Najm C# templates. Najm renders the scene; it does not manage repository indexing or model access.
+Each artifact manifest records the repository commit, renderer revision, template version, image digest, evidence IDs, bot ID, and message ID. Artifacts describe the repository state at answer time; historical images are not automatically regenerated after a commit. Images require the owner's application token and a message belonging to that bot.
 
-Record the repository commit, Najm revision, template version, render settings, and evidence IDs in each artifact manifest. Mark media stale when the repository changes. Generate or regenerate only when the developer asks to illustrate a question.
+Najm's inspected text implementation supports plain text and hard line breaks with bundled Latin Modern fonts. The template wraps labels itself. Arabic shaping, bidirectional layout, and general font fallback require further work; a failed render leaves the answer available.
 
-Rendering must run in an isolated worker with filesystem, network, resource, and output limits. Do not execute arbitrary model-generated C# or run code from the indexed repository. The worker needs selected labels and relationships, not API keys, GitHub credentials, full checkouts, or complete conversation history. Keep the cited answer available if rendering fails.
+## Verification
 
-## First implementation gates
+Focused backend/provider and worker tests use fixtures. The Linux CI server job builds both containers, checks authenticated access and writable repository storage, and renders a real PNG through the restricted worker. Consult the latest CI run for its result; a mocked test or healthy HTTP process alone does not establish that native rendering works.
 
-1. Choose a pinned Najm revision and preserve MIT and bundled third-party notices when distributing components.
-2. Build one reviewed call-chain template and validate a bounded input schema.
-3. Provide the rendering sandbox before enabling the mode.
-4. Render a small public fixture and verify source links, captions, readability, timing, and repeatability in the pinned environment.
-5. Add the UI toggle and media response only after those gates pass.
+No fine-tuning is needed to use this mode. Repository retrieval supplies current evidence and the reviewed template controls the drawing.
 
-Fine-tuning is not a prerequisite for this proposal. The model would explain retrieved evidence and produce validated scene data; the template would control the drawing.
+## Upstream contribution
 
-## Small upstream contribution
-
-A documentation-only proposal was submitted as [Najm PR #1](https://github.com/XMinty77/Najm/pull/1). It describes the relationship with Repo Brain and the adapter boundary. The PR is a draft for maintainer review; its existence does not imply acceptance or an implemented integration.
+[Najm PR #1](https://github.com/XMinty77/Najm/pull/1) is a small documentation proposal explaining this relationship. It remains a draft for maintainer review.

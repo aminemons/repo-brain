@@ -8,6 +8,12 @@ This project is currently based on the MIT-licensed PorunC/CodeWiki source snaps
 |---|---|---|---|---|
 | PorunC/CodeWiki | Base FastAPI/React application, AST/code graph, GraphRAG, wiki/citations, LiteLLM integration, storage and frontend | MIT; <https://github.com/PorunC/CodeWiki> | `7be8f702504cbd69aec6491a2e4e81f5311e0ba6` | Preserve the repository `LICENSE` and upstream notices. This is the pinned base selected by the implementation audit. |
 
+## Najm renderer
+
+The renderer Docker build fetches Najm from <https://github.com/XMinty77/Najm> at commit `6e898a51c7e7e2f0992a194891491fd1253c246e`. Najm is MIT licensed, copyright Abdelhadi BOUZIANI. Its scene, text, and Skia libraries provide the PNG renderer. The image preserves Najm's `LICENSE` and `THIRD-PARTY-NOTICES.md` under `/app/notices/`.
+
+Najm's bundled Latin Modern Roman and Math fonts retain their GUST Font License; both license texts and font READMEs are copied to that directory. Najm's own notices describe its HarfBuzzSharp dependency and font provenance. The fixed adapter source is in `renderer/`; upstream Najm is fetched during the container build rather than vendored into this source archive.
+
 ## Planned or reference-only projects
 
 No source from these projects is recorded as copied into the current product snapshot. The plan's research notes are not a substitute for a current license review at the exact revision before reuse.
