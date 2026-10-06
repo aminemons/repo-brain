@@ -67,7 +67,7 @@ jobs:
         run: bash scripts/server.sh check
       - name: Collect render fixture
         if: success()
-        run: docker compose --env-file deploy/server.env -f compose.server.yml cp app:/tmp/najm-smoke.png najm-smoke.png
+        run: docker compose --env-file deploy/server.env -f compose.server.yml exec -T app python -c "import sys; sys.stdout.buffer.write(open('/tmp/najm-smoke.png', 'rb').read())" > najm-smoke.png
       - uses: actions/upload-artifact@v4
         if: success()
         with:
