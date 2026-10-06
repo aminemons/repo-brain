@@ -1,0 +1,67 @@
+# Run Repo Brain on your server
+
+The server runs the application and a separate Najm image renderer. Docker keeps them running after you disconnect. Repositories, conversations, and generated images live in persistent volumes.
+
+## Install and start
+
+Use a Linux x86-64 server with Git, OpenSSL, Docker Engine, and the Docker Compose plugin installed. Docker must be usable by your login user. The default limits are 2 GB for the app and 512 MB for Najm; allow additional memory for building the images and indexing large repositories.
+
+Clone the private repository using your GitHub account, or extract the supplied archive and enter its `project-brain` directory:
+
+```sh
+git clone https://github.com/aminemons/repo-brain.git
+cd repo-brain
+bash scripts/setup-server.sh
+```
+
+The first build downloads dependencies and the pinned Najm source. Setup creates `deploy/server.env` with a random owner token and restrictive permissions. It then builds both images, starts them, and checks authentication, renderer health, and connectivity to GitHub and OpenAI. It makes no paid model request.
+
+If setup fails, inspect `bash scripts/server.sh logs`, correct the reported problem, and run `bash scripts/server.sh up` again. A healthy renderer HTTP endpoint alone does not prove rendering works; the Linux CI smoke check renders a real PNG with the same container restrictions.
+
+## Private access through SSH
+
+On your own computer, keep this command running, replacing the SSH login:
+
+```sh
+ssh -N -L 8000:127.0.0.1:8000 your-user@your-server
+```
+
+Open <http://127.0.0.1:8000/bots>. The app port is bound to the server's loopback interface. SSH provides the encrypted connection; no public app port or domain is required.
+
+On the server, read `CODEWIKI_AUTH_TOKEN` in `deploy/server.env`. Enter that value in the app's **Settings** page. Keep it private: this is your application login token.
+
+## Connect a repository and model
+
+1. Add a GitHub repository URL, then create its bot. Each repository has its own bot link and history.
+2. Enter your OpenAI API key in the bot page and choose a model your API account can access.
+3. Send a question. The app indexes the selected repository before answering.
+4. Select **Illustrate** for an additional Najm image of the cited evidence. If rendering fails, the normal answer stays available.
+
+Your OpenAI key stays in page/request memory and clears on reload. It is different from the owner token and GitHub credentials.
+
+For private repositories or publishing branches and pull requests, put a GitHub token in `GH_TOKEN` in `deploy/server.env`, then run `bash scripts/server.sh up`. Give it access only to the repositories you choose, with Contents and Pull requests write permissions when publishing changes. The application image includes Git and the GitHub CLI. A path on your own PC is unavailable to the server; use a GitHub URL or deliberately mount a server checkout.
+
+## Optional HTTPS domain
+
+Point a domain to the server and allow inbound TCP ports 80 and 443. On a fresh installation:
+
+```sh
+bash scripts/setup-server.sh --domain brain.example.com
+```
+
+For an existing installation, set `PUBLIC_DOMAIN=brain.example.com` in `deploy/server.env`, then run `bash scripts/server.sh up`. Caddy obtains and renews certificates. Open `https://brain.example.com/bots` and use the same owner token. Leave `PUBLIC_DOMAIN` empty for SSH-only access.
+
+## Maintenance
+
+```sh
+bash scripts/server.sh status
+bash scripts/server.sh check
+bash scripts/server.sh logs
+bash scripts/server.sh stop
+```
+
+For a Git clone, `bash scripts/server.sh update` pulls the next commit and rebuilds. Preserve local source changes before updating. For an archive installation, stop the app and replace the source files, keeping `deploy/server.env`, then start again. Named Docker volumes survive a stop and rebuild.
+
+Back up both `app-data` and `app-storage` volumes while the app is stopped; the first includes SQLite and the second includes checkouts, indexes, and images. Back up the private environment file separately. Never use `docker compose down --volumes` unless you intend to delete the stored data.
+
+Najm receives bounded labels and verified relationships through an internal network. It has no repository mount, API key, or outbound network. The app needs outbound access to GitHub and OpenAI. The older `compose.project-brain.yml` is a separate local-model deployment profile; use `compose.server.yml` for this repository-bot setup.

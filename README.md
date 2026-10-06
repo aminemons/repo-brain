@@ -4,7 +4,21 @@ A workspace for the repositories you work on. Create a bot for each repo, ask it
 
 Each bot has its own link, instructions, conversations, and change history. You choose which repositories to add. Model requests use the OpenAI API key you enter for that session.
 
-## Run locally
+## Run on a server
+
+On a Linux server with Docker, Docker Compose, Git, and OpenSSL installed:
+
+```sh
+git clone https://github.com/aminemons/repo-brain.git
+cd repo-brain
+bash scripts/setup-server.sh
+```
+
+From your computer, connect with `ssh -N -L 8000:127.0.0.1:8000 your-user@your-server`, then open [Bots](http://127.0.0.1:8000/bots). Enter the generated owner token from `deploy/server.env` in **Settings**. Your OpenAI key is entered separately in the bot page.
+
+See [server setup](deploy/SERVER_SETUP.md) for private GitHub repositories, HTTPS, updates, and backups. The app and Najm renderer run as separate containers with persistent storage.
+
+## Local development
 
 Requirements: Python 3.12+, Node.js 22+, Git, and [uv](https://docs.astral.sh/uv/).
 
@@ -22,7 +36,7 @@ To keep the app running after closing the terminal:
 .\scripts\start-project-brain.ps1 -Background
 ```
 
-The launcher starts a hidden Windows task named `RepoBrain-Local-8000`, waits for a healthy API, and writes its PID and logs to `.run/`. The task starts manually and has no recurring schedule. To stop it, run `Stop-ScheduledTask -TaskName RepoBrain-Local-8000`.
+The launcher uses a hidden Windows task named `RepoBrain-Local-8000` and writes logs to `.run/`. Persistence through desktop sessions is not verified on every Windows installation. For continuous use, use the Linux server setup above. To stop the Windows task, run `Stop-ScheduledTask -TaskName RepoBrain-Local-8000`.
 
 Manual setup works on other platforms:
 
@@ -40,7 +54,7 @@ uv run --locked --extra docs python -m uvicorn backend.app.main:app --host 127.0
 3. Enter your OpenAI API key and choose a model your API account can access.
 4. Send a question. The first conversation indexes the repository automatically.
 
-You can ask for an explanation, a lesson, or a code change. Answers include repository evidence when available. Refresh knowledge after local changes; the watcher also tracks new commits.
+You can ask for an explanation, a lesson, an illustration, or a code change. Answers include repository evidence when available. Illustrate adds a Najm image of that evidence through the server renderer. Refresh knowledge after local changes; the watcher also tracks new commits.
 
 The key stays in page and request memory. Reloading the page clears it. API usage is billed to the account that owns the key. Selected repository excerpts and conversation context are sent to OpenAI for these requests.
 
@@ -76,7 +90,8 @@ The focused bot tests use temporary repositories and a stub model provider. They
 ## Further reading
 
 - [Bot guide](docs/BOT_USER_GUIDE.md)
-- [Deployment](deploy/README.md)
+- [Server setup](deploy/SERVER_SETUP.md)
+- [Other deployment profiles](deploy/README.md)
 - [Security](SECURITY.md)
 - [Current plan status](docs/PLAN_STATUS.md)
 

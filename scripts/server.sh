@@ -18,35 +18,7 @@ case "${1:-status}" in
     git pull --ff-only
     "${compose[@]}" up --build --detach --wait --wait-timeout 300 ;;
   check)
-    "${compose[@]}" exec -T app python - <<'PY'
-import json
-import os
-import shutil
-import urllib.error
-import urllib.request
-
-request = urllib.request.Request(
-    "http://127.0.0.1:8000/api/bots",
-    headers={"Authorization": "Bearer " + os.environ["CODEWIKI_AUTH_TOKEN"]},
-)
-with urllib.request.urlopen(request, timeout=10) as response:
-    bots = json.load(response)
-print("Application API and owner authentication: OK")
-print("Registered bots:", len(bots["bots"]))
-with urllib.request.urlopen("http://najm:8080/health", timeout=10) as response:
-    renderer = json.load(response)
-print("Najm worker health:", renderer.get("status", "unknown"))
-for name, url in (("OpenAI", "https://api.openai.com/"), ("GitHub", "https://github.com/")):
-    try:
-        urllib.request.urlopen(url, timeout=10).close()
-    except urllib.error.HTTPError:
-        pass
-    print(name + " DNS/TLS connectivity: OK")
-if not shutil.which("gh"):
-    raise SystemExit("GitHub CLI is missing from the application image.")
-print("GitHub CLI: installed")
-print("No model request was made. Enter your OpenAI key and an accessible model ID in a bot to test an answer.")
-PY
+    "${compose[@]}" exec -T app python - < scripts/smoke-server.py
     ;;
   *) echo 'Usage: bash scripts/server.sh {config|up|stop|status|logs|update|check}' >&2; exit 2 ;;
 esac

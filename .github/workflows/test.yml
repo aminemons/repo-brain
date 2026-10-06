@@ -37,11 +37,11 @@ jobs:
           uv run ruff check backend/app/api/bots.py backend/app/api/bot_changes.py
           backend/app/schemas/bots.py backend/app/schemas/bot_changes.py
           backend/app/services/bots backend/app/services/bot_changes
-          tests/backend/test_bots_api.py tests/backend/test_bot_changes.py
+          tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py
       - name: Check backend types
         run: uv run mypy backend/app
       - name: Test repository chat and Git workflows
-        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py -q
+        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py renderer/tests -q
       - name: Run inherited suite when requested
         if: inputs.full_suite == true
         run: uv run pytest -q
@@ -49,3 +49,35 @@ jobs:
         run: npm --prefix frontend ci
       - name: Build frontend
         run: npm --prefix frontend run build
+
+  server:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell scripts and prepare private deployment
+        run: |
+          bash -n scripts/setup-server.sh
+          bash -n scripts/server.sh
+          bash scripts/setup-server.sh --prepare-only
+          PUBLIC_DOMAIN=fixture.example.com docker compose --env-file deploy/server.env -f compose.server.yml -f compose.server.https.yml config --quiet
+      - name: Build and start Linux containers
+        run: bash scripts/server.sh up
+      - name: Verify authentication, storage, network access and real Najm rendering
+        run: bash scripts/server.sh check
+      - name: Collect render fixture
+        if: success()
+        run: docker compose --env-file deploy/server.env -f compose.server.yml cp app:/tmp/najm-smoke.png najm-smoke.png
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: najm-linux-render
+          path: najm-smoke.png
+      - name: Container diagnostics
+        if: failure()
+        run: |
+          bash scripts/server.sh status
+          bash scripts/server.sh logs
+      - name: Stop containers
+        if: always()
+        run: docker compose --env-file deploy/server.env -f compose.server.yml down
