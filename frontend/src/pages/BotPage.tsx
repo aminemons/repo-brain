@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, Clipboard, FileCode2, GitPullRequest, Image as ImageIcon, KeyRound, LoaderCircle, MessageSquareText, MessageSquarePlus, RefreshCw, Send, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -455,6 +455,45 @@ function ChatPanel({
   onSubmit: (event: FormEvent) => void;
 }) {
   const apiKeyInputRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const followLatestRef = useRef(true);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const scrollToLatest = useCallback((behavior: ScrollBehavior = "auto") => {
+    const messages = messagesRef.current;
+    if (!messages) return;
+    followLatestRef.current = true;
+    setShowJumpToLatest(false);
+    messages.scrollTo({ top: messages.scrollHeight, behavior });
+  }, []);
+  const scrollToLatestIfFollowing = useCallback(() => {
+    if (followLatestRef.current) scrollToLatest();
+  }, [scrollToLatest]);
+  const handleMessagesScroll = () => {
+    const messages = messagesRef.current;
+    if (!messages) return;
+    const atLatest = messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 48;
+    followLatestRef.current = atLatest;
+    setShowJumpToLatest(!atLatest);
+  };
+  const handleSubmit = (event: FormEvent) => {
+    if (message.trim() && activeConversationId && apiKey.trim() && !sending && !refreshingKnowledge) {
+      scrollToLatest();
+    }
+    onSubmit(event);
+  };
+
+  useLayoutEffect(() => {
+    followLatestRef.current = true;
+    setShowJumpToLatest(false);
+    scrollToLatest();
+  }, [activeConversationId, conversationLoading, scrollToLatest]);
+
+  useLayoutEffect(() => {
+    if (!conversationLoading && detail?.conversation.id === activeConversationId && followLatestRef.current) {
+      scrollToLatest();
+    }
+  }, [activeConversationId, conversationLoading, detail?.conversation.id, detail?.messages.length, sending, scrollToLatest]);
+
   useEffect(() => {
     if (!focusApiKey) return;
     apiKeyInputRef.current?.focus();
@@ -472,19 +511,22 @@ function ChatPanel({
       </div>
       {bot.instructions ? <details className="bot-instructions"><summary>Bot instructions</summary><p>{bot.instructions}</p></details> : null}
       {!hasRefreshed && !detail?.messages.length ? <div className="bot-refresh-hint"><RefreshCw size={14} /><span>Your first message prepares the repository index. Use Refresh knowledge after local changes.</span></div> : null}
-      <div className="bot-messages" aria-live="polite">
-        {conversationLoading ? <div className="bot-chat-empty">Loading conversation…</div> : null}
-        {!conversationLoading && conversationError ? <div className="bot-chat-empty" role="alert"><strong>This conversation could not be loaded.</strong><span>{conversationError}</span><button type="button" className="bot-secondary-button" onClick={onRetryConversation}>Retry</button></div> : null}
-        {!conversationLoading && !conversationError && (!detail || detail.messages.length === 0) ? <div className="bot-chat-empty"><MessageSquareText size={22} /><strong>Start a conversation</strong><span>Ask about this project, or switch to Teach to explore the code step by step.</span></div> : null}
-        {detail?.messages.map((item) => <MessageBubble key={item.id} botId={botId} activeConversationId={activeConversationId} message={item} />)}
-        {sending ? <div className="bot-processing" role="status"><LoaderCircle size={14} className="bot-spinner" /><span>{processingMode === "illustrate" ? "Najm is preparing a static evidence map from the cited project sources. This can take a little longer." : "Working through the project sources…"}</span></div> : null}
+      <div className="bot-messages-wrap">
+        <div className="bot-messages" ref={messagesRef} onScroll={handleMessagesScroll} aria-live="polite">
+          {conversationLoading ? <div className="bot-chat-empty">Loading conversation…</div> : null}
+          {!conversationLoading && conversationError ? <div className="bot-chat-empty" role="alert"><strong>This conversation could not be loaded.</strong><span>{conversationError}</span><button type="button" className="bot-secondary-button" onClick={onRetryConversation}>Retry</button></div> : null}
+          {!conversationLoading && !conversationError && (!detail || detail.messages.length === 0) ? <div className="bot-chat-empty"><MessageSquareText size={22} /><strong>Start a conversation</strong><span>Ask about this project, or switch to Teach to explore the code step by step.</span></div> : null}
+          {detail?.messages.map((item) => <MessageBubble key={item.id} botId={botId} activeConversationId={activeConversationId} message={item} onImageLoad={scrollToLatestIfFollowing} />)}
+          {sending ? <div className="bot-processing" role="status"><LoaderCircle size={14} className="bot-spinner" /><span>{processingMode === "illustrate" ? "Najm is preparing a static evidence map from the cited project sources. This can take a little longer." : "Working through the project sources…"}</span></div> : null}
+        </div>
+        {showJumpToLatest ? <button type="button" className="bot-jump-latest" onClick={() => scrollToLatest("smooth")}>Jump to latest</button> : null}
       </div>
-      <form className={`bot-composer${refreshingKnowledge ? " is-disabled" : ""}`} onSubmit={onSubmit}>
+      <form className={`bot-composer${refreshingKnowledge ? " is-disabled" : ""}`} onSubmit={handleSubmit}>
         <label className="bot-key-field"><span><KeyRound size={13} /> OpenAI API key</span>
           <input ref={apiKeyInputRef} type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => onApiKeyChange(event.target.value)} placeholder="sk-…" aria-label="Your OpenAI API key" />
         </label>
         {apiKeyPrompt ? <p className="bot-key-prompt" role="status">{apiKeyPrompt}</p> : null}
-        <p className="bot-data-note">Your OpenAI key stays in this page's memory and is sent with each AI request. It is separate from the Repo Brain owner token in Settings. Selected project excerpts are sent to OpenAI to answer.</p>
+        <details className="bot-data-note"><summary>How your data is used</summary><p>Your OpenAI key stays in this page's memory and is sent with each AI request. It is separate from the Repo Brain owner token in Settings. Selected project excerpts are sent to OpenAI to answer.</p></details>
         <div className="bot-compose-row">
           <textarea aria-label="Message" value={message} onChange={(event) => onMessageChange(event.target.value)} placeholder={refreshingKnowledge ? "Chat will be available after refresh…" : mode === "teach" ? "What would you like to learn about?" : mode === "illustrate" ? "What should Najm explain with a static evidence map?" : "Ask this bot about the project…"} rows={3} disabled={refreshingKnowledge} />
           <button type="submit" className="bots-primary-button bot-send-button" disabled={!apiKey.trim() || !message.trim() || !detail || sending || refreshingKnowledge} aria-label="Send message">
@@ -496,12 +538,12 @@ function ChatPanel({
   );
 }
 
-function MessageBubble({ message, botId, activeConversationId }: { message: BotMessage; botId: string; activeConversationId: string | null }) {
+function MessageBubble({ message, botId, activeConversationId, onImageLoad }: { message: BotMessage; botId: string; activeConversationId: string | null; onImageLoad: () => void }) {
   return (
     <article className={`bot-message${message.role === "user" ? " is-user" : " is-assistant"}`}>
       <div className="bot-message-role">{message.role === "user" ? "You" : "Bot"}</div>
       <div className="bot-message-content"><SafeMarkdown content={message.content} /></div>
-      {message.illustration ? <NajmIllustration botId={botId} activeConversationId={activeConversationId} message={message} /> : null}
+      {message.illustration ? <NajmIllustration botId={botId} activeConversationId={activeConversationId} message={message} onImageLoad={onImageLoad} /> : null}
       {message.sources?.length ? <div className="bot-citations"><strong>Project sources</strong>
         {message.sources.map((source) => <details key={source.id} className="bot-citation"><summary><strong className="bot-source-id">{source.id}</strong><FileCode2 size={13} /><span>{source.path}</span><small>:{source.start_line}–{source.end_line}</small></summary>{source.snippet ? <pre>{source.snippet}</pre> : null}</details>)}
       </div> : null}
@@ -509,7 +551,7 @@ function MessageBubble({ message, botId, activeConversationId }: { message: BotM
   );
 }
 
-function NajmIllustration({ botId, activeConversationId, message }: { botId: string; activeConversationId: string | null; message: BotMessage }) {
+function NajmIllustration({ botId, activeConversationId, message, onImageLoad }: { botId: string; activeConversationId: string | null; message: BotMessage; onImageLoad: () => void }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const illustration = message.illustration;
@@ -549,7 +591,7 @@ function NajmIllustration({ botId, activeConversationId, message }: { botId: str
       {unavailable ? <p role="status">Najm could not create an illustration for this answer. The text and project citations are still available.</p> : null}
       {error ? <p role="status">The Najm image could not be loaded. The answer and cited evidence remain available. {error}</p> : null}
       {!unavailable && !error && !imageUrl ? <p role="status">Loading the Najm evidence map…</p> : null}
-      {imageUrl ? <img src={imageUrl} alt={illustration.alt_text || illustration.caption || "Najm static evidence map"} onError={() => {
+      {imageUrl ? <img src={imageUrl} alt={illustration.alt_text || illustration.caption || "Najm static evidence map"} onLoad={onImageLoad} onError={() => {
         URL.revokeObjectURL(imageUrl);
         setImageUrl(null);
         setError("The returned image could not be displayed.");
