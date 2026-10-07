@@ -48,6 +48,25 @@ jobs:
       - name: Run inherited suite when requested
         if: inputs.full_suite == true
         run: uv run pytest -q
+      - name: Retrieve pinned public repository fixtures
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'owner-repositories'
+          root.mkdir()
+          for fixture in json.loads(pathlib.Path('tests/acceptance/owner-repositories.json').read_text()):
+              target = root / fixture['name']
+              subprocess.run(['git', 'init', str(target)], check=True)
+              subprocess.run(['git', '-C', str(target), 'remote', 'add', 'origin', fixture['url']], check=True)
+              subprocess.run(['git', '-C', str(target), 'fetch', '--depth=1', 'origin', fixture['commit']], check=True)
+              subprocess.run(['git', '-C', str(target), 'checkout', '--detach', 'FETCH_HEAD'], check=True)
+          PY
+      - name: Check evidence against real owner repositories
+        run: uv run python scripts/check-owner-repositories.py --checkouts "$RUNNER_TEMP/owner-repositories" --report owner-repository-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: owner-repository-evidence
+          path: owner-repository-results.json
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
       - name: Build frontend

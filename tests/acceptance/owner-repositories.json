@@ -1,0 +1,22 @@
+[
+  {
+    "name": "kaisser-explore",
+    "url": "https://github.com/aminemons/kaisser-explore",
+    "commit": "e44fcfd45ce4e6ea842018fa2ecb46a60d33b1f8",
+    "questions": [
+      {"query": "Where is initLang defined and how does it initialize the language?", "path": "src/js/i18n.js", "symbol": "initLang"},
+      {"query": "Explain setLang and the language change notification flow", "path": "src/js/i18n.js", "symbol": "setLang"},
+      {"query": "Where is initReviewsSlider and how does review autoplay work?", "path": "src/js/slider.js", "symbol": "initReviewsSlider"}
+    ]
+  },
+  {
+    "name": "pfe",
+    "url": "https://github.com/aminemons/pfe",
+    "commit": "cc8c29d1d75a232368d66cd24560f40c46d5cd4e",
+    "questions": [
+      {"query": "How does buildPath create the chart path?", "path": "src/components/Diagrams.tsx", "symbol": "buildPath"},
+      {"query": "Where is rise defined and how is the rising curve calculated?", "path": "src/components/Diagrams.tsx", "symbol": "rise"},
+      {"query": "Explain the PresentationEngine component", "path": "src/components/PresentationEngine.tsx", "symbol": "PresentationEngine"}
+    ]
+  }
+]
