@@ -363,6 +363,9 @@ def test_cli_lite_agents_install_codex_global_config(tmp_path: Path, monkeypatch
     repo_dir.mkdir()
     home_dir.mkdir()
     monkeypatch.setenv("HOME", str(home_dir))
+    # Windows Path.home() resolves USERPROFILE rather than HOME. Keep global
+    # installer tests inside the fixture on every platform.
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home_dir))
     runner = CliRunner()
 
     result = runner.invoke(
@@ -384,7 +387,9 @@ def test_cli_lite_agents_install_codex_global_config(tmp_path: Path, monkeypatch
     config = (home_dir / ".codex" / "config.toml").read_text(encoding="utf-8")
     assert "[mcp_servers.codewiki-lite]" in config
     assert 'command = "codewiki"' in config
-    assert f'"{repo_dir.resolve()}"' in config
+    import tomllib
+    parsed = tomllib.loads(config)
+    assert parsed["mcp_servers"]["codewiki-lite"]["args"][-1] == str(repo_dir.resolve())
     instructions = (home_dir / ".codex" / "AGENTS.md").read_text(encoding="utf-8")
     assert "<!-- CODEWIKI_LITE_START -->" in instructions
     assert "codewiki lite sync ." in instructions

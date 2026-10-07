@@ -50,7 +50,7 @@ def test_clone_command_always_uses_shallow_depth_one() -> None:
         "1",
         "--progress",
         "https://github.com/facebook/react.git",
-        "/tmp/react",
+        str(Path("/tmp/react")),
     ]
 
 

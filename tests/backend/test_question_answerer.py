@@ -56,9 +56,11 @@ class _FakeQALLM:
     ) -> LLMResult:
         assert task_type == "qa"
         assert response_format is None
-        assert "GraphRAG context" in messages[-2]["content"]
+        assert "Stable QA contract" in messages[-2]["content"]
         assert messages[-1]["content"].startswith("GraphRAG QA payload:")
         assert "community_summaries" in messages[-1]["content"]
+        assert "handler" in messages[-1]["content"]
+        assert "api.py" in messages[-1]["content"]
         return LLMResult(
             content="`handler` calls `answer`, which returns 42. See api.py and service.py.",
             model="fake/qa",
