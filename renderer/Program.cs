@@ -201,7 +201,7 @@ internal static class Program
             var current = "";
             foreach (var word in words)
             {
-                var pieces = Measure(word, size) <= width ? new[] { word } : SplitLongWord(word, width, size);
+                IEnumerable<string> pieces = Measure(word, size) <= width ? new[] { word } : SplitLongWord(word, width, size);
                 foreach (var piece in pieces)
                 {
                     var candidate = current.Length == 0 ? piece : $"{current} {piece}";
