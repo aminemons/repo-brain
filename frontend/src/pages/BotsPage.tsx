@@ -1,8 +1,10 @@
-import { ChevronRight, FileCode2, FolderGit2, Plus, RefreshCw } from "lucide-react";
+import { ChevronRight, FileCode2, FolderGit2, Github, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { createBot, getBots, refreshBotKnowledge, type Bot } from "../api/bots";
+import type { GitHubRepository } from "../api/github";
 import { createRepo } from "../api/repos";
+import { GitHubRepositoryPicker } from "../bots/GitHubRepositoryPicker";
 import type { RepoSummary } from "../api/types";
 import { useRepos } from "../hooks/useRepos";
 
@@ -15,6 +17,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
   const [loadError, setLoadError] = useState<string | null>(null);
   const [repoId, setRepoId] = useState("");
   const [addRepository, setAddRepository] = useState(false);
+  const [githubPickerOpen, setGithubPickerOpen] = useState(false);
   const [repoPath, setRepoPath] = useState("");
   const [repoDisplayName, setRepoDisplayName] = useState("");
   const [name, setName] = useState("");
@@ -60,6 +63,26 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
     }
     return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
   }, [bots, repoById]);
+
+  const selectGitHubRepository = (repository: GitHubRepository, existingBotId: string | null) => {
+    setGithubPickerOpen(false);
+    setCreateError(null);
+    if (existingBotId) {
+      onOpenBot(existingBotId);
+      return;
+    }
+    if (repository.repo_id) {
+      setAddRepository(false);
+      setRepoId(repository.repo_id);
+      setRepoPath("");
+      setRepoDisplayName("");
+      return;
+    }
+    setRepoId("");
+    setAddRepository(true);
+    setRepoPath(repository.url);
+    setRepoDisplayName(repository.full_name);
+  };
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
@@ -173,12 +196,24 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
           <p className="bot-form-intro">Select a repository or add a local folder or Git URL. The index is prepared before the conversation opens.</p>
           <form className="bot-create-form" onSubmit={(event) => void handleCreate(event)}>
             {!addRepository ? (
-              <label className="field"><span>Repository</span>
-                <select value={repoId} onChange={(event) => setRepoId(event.target.value)} disabled={reposLoading || availableRepos.length === 0}>
-                  <option value="">{reposLoading ? "Loading repositories…" : "Choose a repository"}</option>
-                  {availableRepos.map((repo) => <option key={repo.id} value={repo.id}>{repo.name}</option>)}
-                </select>
-              </label>
+              <>
+                <button
+                  type="button"
+                  className="bot-github-browse-button"
+                  aria-expanded={githubPickerOpen}
+                  aria-controls={githubPickerOpen ? "bot-github-repository-picker" : undefined}
+                  onClick={() => setGithubPickerOpen((open) => !open)}
+                >
+                  <Github size={15} />{githubPickerOpen ? "Close GitHub browser" : "Browse GitHub repositories"}
+                </button>
+                {githubPickerOpen ? <div id="bot-github-repository-picker"><GitHubRepositoryPicker bots={bots} onSelect={selectGitHubRepository} /></div> : null}
+                <label className="field"><span>Repository</span>
+                  <select value={repoId} onChange={(event) => setRepoId(event.target.value)} disabled={reposLoading || availableRepos.length === 0}>
+                    <option value="">{reposLoading ? "Loading repositories…" : "Choose a repository"}</option>
+                    {availableRepos.map((repo) => <option key={repo.id} value={repo.id}>{repo.name}</option>)}
+                  </select>
+                </label>
+              </>
             ) : (
               <div className="bot-source-setup">
                 <div className="bot-source-setup-title"><FolderGit2 size={15} /><strong>Add repository</strong></div>
@@ -186,7 +221,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
                 <label className="field"><span>Display name <small>Optional</small></span><input value={repoDisplayName} onChange={(event) => setRepoDisplayName(event.target.value)} placeholder="service" /></label>
               </div>
             )}
-            <button type="button" className="bot-text-link" disabled={creating} onClick={() => { setAddRepository((value) => !value); setCreateError(null); }}>
+            <button type="button" className="bot-text-link" disabled={creating} onClick={() => { setAddRepository((value) => !value); setGithubPickerOpen(false); setCreateError(null); }}>
               {addRepository ? "Choose an existing repository" : "+ Add a repository"}
             </button>
             <label className="field"><span>Bot name</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Service guide" maxLength={120} required /></label>
