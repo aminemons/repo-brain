@@ -49,16 +49,16 @@ uv run --locked --extra docs python -m uvicorn backend.app.main:app --host 127.0
 
 ## Create your first bot
 
-1. Open **Bots** and add a local checkout or a GitHub repository URL.
+1. Open **Bots**, choose **Browse GitHub repositories**, or add a checkout or GitHub URL manually. Browsing uses the GitHub account configured on the server.
 2. Create its bot and open the bot's link.
 3. Enter your OpenAI API key and choose a model your API account can access.
 4. Send a question. The first conversation indexes the repository automatically.
 
-You can ask for an explanation, a lesson, an illustration, or a code change. Answers include repository evidence when available. Illustrate adds a Najm image of that evidence through the server renderer. Refresh knowledge after local changes; the watcher also tracks new commits.
+You can ask for an explanation, a lesson, an illustration, or a code change. Answers include repository evidence when available. Illustrate adds a Najm image of that evidence through the server renderer. Each question checks the code index for changes and rejects changed or deleted documentation excerpts. The watcher also tracks new commits for documentation review.
 
 The key stays in page and request memory. Reloading the page clears it. API usage is billed to the account that owns the key. Selected repository excerpts and conversation context are sent to OpenAI for these requests.
 
-For private GitHub repositories, authenticate Git on the machine running Repo Brain. Your OpenAI key gives access to the model; Git credentials give access to the repository.
+For GitHub browsing and private repositories, configure `GH_TOKEN` on the machine running Repo Brain, or authenticate its GitHub CLI. The server account is separate from your desktop account. GitHub credentials remain on the server. Your OpenAI key gives access to the model; Git credentials give access to the repository.
 
 ## Changes and documentation
 

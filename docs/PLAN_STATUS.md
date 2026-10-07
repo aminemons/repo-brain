@@ -1,6 +1,6 @@
 # Master plan execution status
 
-Status snapshot: 2026-10-06. The supplied master plan and the owner's clarified repository-bot workflow are the product specification. This tracker applies them to the available PorunC/CodeWiki foundation and does not treat platform features as proof about an unavailable target application.
+Status snapshot: 2026-10-07. The supplied master plan and the owner's clarified repository-bot workflow guide the implementation. The application builds on PorunC/CodeWiki. Owner GitHub access is available; server access and the separate project manual remain unavailable.
 
 ## Phase status
 
@@ -20,13 +20,13 @@ Status snapshot: 2026-10-06. The supplied master plan and the owner's clarified 
 
 The owner selects repositories, creates one bot per repository, and initially has private access. Each bot has a dedicated link, instructions, model choice, persistent conversations, and repository-scoped evidence. Each user supplies an OpenAI key for AI requests. Changes and documentation updates are delivered through branches and pull requests for review. See `REPOSITORY_BOTS_PLAN.md` and `BOT_USER_GUIDE.md` for the updated workflow.
 
-Focused fixture tests now cover repository chat, Git changes, and the Najm worker; deployment checks run on Linux CI. Live paid model requests, the user's selected repositories, and the actual OVH host still require verification. The current server profile supplies private SSH access, persistent storage, and an isolated Najm PNG renderer. See `deploy/SERVER_SETUP.md` and `NAJM_EXPLANATION_MODE.md`.
+Focused fixture tests cover repository chat, Git changes, and the Najm worker; deployment and browser checks run on Linux CI. The owner can browse repositories through the server's GitHub account. Each chat checks for code changes; edited or deleted documentation is excluded until refreshed. Pinned JavaScript and TypeScript owner projects are used for additional evidence checks. These checks do not execute project commands or make paid model requests. The current server profile supplies private SSH access, persistent storage, and an isolated Najm PNG renderer. See `deploy/SERVER_SETUP.md` and `NAJM_EXPLANATION_MODE.md`.
 
 ## Next acceptance gates
 
-1. Obtain access to the actual target Git repository and record its language/framework, build/config/test files, size, and canonical commands.
+1. Extend the pinned owner-repository evidence checks with maintainer-reviewed questions for each chosen bot. GitHub access is available; every repository still needs its own acceptance criteria.
 2. Obtain the separate project manual, identify versions and authoritative sections, then choose the parser based on its actual layout.
 3. Record OVH hardware and network facts before selecting a local model or claiming capacity.
-4. Finish read-only authentication and configured-root confinement before exposing the app beyond localhost/private access.
+4. Verify owner authentication, configured-root confinement, backups, and recovery on the actual server before public exposure. Linux CI already checks authentication and storage in containers.
 5. Build a maintainer-reviewed evidence benchmark against the actual project before claiming Phase 1 acceptance.
 6. Keep write mode, external evidence sharing, and public production exposure behind their respective security and privacy gates.

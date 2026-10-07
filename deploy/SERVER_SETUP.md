@@ -32,7 +32,7 @@ On the server, read `CODEWIKI_AUTH_TOKEN` in `deploy/server.env`. Enter that val
 
 ## Connect a repository and model
 
-1. Add a GitHub repository URL, then create its bot. Each repository has its own bot link and history.
+1. Choose **Browse GitHub repositories** to select from the server's GitHub account, or add a repository URL manually, then create its bot. Each repository has its own bot link and history. Browsing an existing bot opens its link without creating a duplicate.
 2. Enter your OpenAI API key in the bot page and choose a model your API account can access.
 3. Send a question. The app indexes the selected repository before answering.
 4. Select **Illustrate** for an additional Najm image of the cited evidence. If rendering fails, the normal answer stays available.
