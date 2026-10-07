@@ -100,7 +100,7 @@ export function GitHubRepositoryPicker({
       {error ? (
         <div className="bot-github-state is-error" role="alert">
           <span>{error}</span>
-          <button type="button" className="bot-github-retry" onClick={() => void loadPage(repositories.length ? (nextPage ?? 1) : 1, repositories.length > 0)}>
+          <button type="button" className="bot-github-retry" onClick={() => void loadPage(repositories.length ? (nextPage ?? 1) : 1, repositories.length === 0)}>
             <RefreshCw size={13} />Retry
           </button>
         </div>
@@ -108,7 +108,7 @@ export function GitHubRepositoryPicker({
 
       {configured !== false && loading && repositories.length === 0 ? <div className="bot-github-state" role="status">Loading repositories…</div> : null}
 
-      {configured !== false && !loading && !error && repositories.length === 0 ? (
+      {configured === true && !loading && !error && repositories.length === 0 ? (
         <div className="bot-github-state"><strong>No repositories found</strong><p>Try adding a local folder or Git URL below.</p></div>
       ) : null}
 

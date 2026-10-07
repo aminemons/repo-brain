@@ -86,7 +86,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
 
   const handleCreate = async (event: FormEvent) => {
     event.preventDefault();
-    if (creating || !name.trim() || !model.trim()) return;
+    if (loadingBots || creating || !name.trim() || !model.trim()) return;
     if (addRepository && !repoPath.trim()) return;
     if (!addRepository && !repoId) return;
 
@@ -230,7 +230,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
             {reposError ? <div className="bots-message is-error" role="alert">{reposError}</div> : null}
             {createError ? <div className="bots-message is-error" role="alert">{createError}{createdBotId ? <button type="button" className="bot-text-link" onClick={() => onOpenBot(createdBotId)}>Open the created bot</button> : null}</div> : null}
             {createNotice ? <div className="bots-message" role="status"><RefreshCw size={14} className={creating ? "is-spinning" : undefined} />{stageText[stage] || createNotice}</div> : null}
-            <button className="button button-primary" type="submit" disabled={creating || !name.trim() || !model.trim() || (addRepository ? !repoPath.trim() : !repoId)}>
+            <button className="button button-primary" type="submit" disabled={loadingBots || creating || !name.trim() || !model.trim() || (addRepository ? !repoPath.trim() : !repoId)}>
               <Plus size={15} />{creating ? stageText[stage] || "Creating…" : "Create bot"}
             </button>
             <button type="button" className="bot-text-link bot-all-repos" onClick={onOpenRepos}>Manage repositories</button>
