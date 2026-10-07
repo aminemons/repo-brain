@@ -1,6 +1,8 @@
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from backend.app.database import (
     CodeChunkEmbeddingRecord,
     CodeChunkRecord,
@@ -12,8 +14,8 @@ from backend.app.database import (
 from backend.app.models import Base, CodeNodeRecord, DocCatalogRecord, RepoRecord
 from backend.app.services.analyzer import AnalysisService
 from backend.app.services.graph import CodeGraphNode
-from backend.app.services.repo_scanner.models import RepoDescriptor
 from backend.app.services.repo_scanner import RepoScanner
+from backend.app.services.repo_scanner.models import RepoDescriptor
 
 
 def test_persistence_models_are_sqlalchemy_orm_tables() -> None:
@@ -66,6 +68,39 @@ def test_schema_contains_graphrag_wiki_and_llm_tables(tmp_path: Path) -> None:
     assert {"response_content", "response_usage_json"} <= llm_run_columns
     assert "language_code" in catalog_columns
     assert "language_code" in page_columns
+
+
+def test_store_connection_context_commits_and_closes(tmp_path: Path) -> None:
+    database_path = tmp_path / "codewiki.sqlite3"
+    store = SQLiteStore(database_path)
+    with store.connect() as connection:
+        connection.execute("CREATE TABLE lifecycle_probe (value TEXT)")
+        connection.execute("INSERT INTO lifecycle_probe VALUES ('committed')")
+
+    with pytest.raises(sqlite3.ProgrammingError):
+        connection.execute("SELECT 1")
+
+    with sqlite3.connect(database_path) as check_connection:
+        values = check_connection.execute("SELECT value FROM lifecycle_probe").fetchall()
+    assert values == [("committed",)]
+
+
+def test_store_connection_context_rolls_back_and_closes_on_error(tmp_path: Path) -> None:
+    database_path = tmp_path / "codewiki.sqlite3"
+    store = SQLiteStore(database_path)
+    with store.connect() as connection:
+        connection.execute("CREATE TABLE lifecycle_probe (value TEXT)")
+
+    with pytest.raises(ValueError, match="force rollback"), store.connect() as connection:
+        connection.execute("INSERT INTO lifecycle_probe VALUES ('rolled back')")
+        raise ValueError("force rollback")
+
+    with pytest.raises(sqlite3.ProgrammingError):
+        connection.execute("SELECT 1")
+
+    with sqlite3.connect(database_path) as check_connection:
+        values = check_connection.execute("SELECT value FROM lifecycle_probe").fetchall()
+    assert values == []
 
 
 def test_schema_migrates_existing_repo_git_metadata_columns(tmp_path: Path) -> None:

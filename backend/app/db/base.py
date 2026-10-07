@@ -1,8 +1,8 @@
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
@@ -16,6 +16,16 @@ from backend.app.models import Base
 
 SQLITE_BUSY_TIMEOUT_SECONDS = 30
 SQLITE_BUSY_TIMEOUT_MS = SQLITE_BUSY_TIMEOUT_SECONDS * 1000
+
+
+class ClosingSQLiteConnection(sqlite3.Connection):
+    """SQLite connection that closes after its transaction context exits."""
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
 
 
 @dataclass(frozen=True)
@@ -157,6 +167,7 @@ class SQLiteStoreBase(BaseStore):
             self.database_path,
             timeout=SQLITE_BUSY_TIMEOUT_SECONDS,
             check_same_thread=False,
+            factory=ClosingSQLiteConnection,
         )
         connection.row_factory = sqlite3.Row
         self._configure_connection(connection)
