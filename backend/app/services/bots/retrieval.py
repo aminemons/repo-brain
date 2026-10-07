@@ -56,7 +56,7 @@ class BotEvidenceRetriever:
         hashes_by_path = {
             node.file_path: node.hash
             for node in nodes
-            if node.type == "file" and node.file_path and node.hash
+            if node.type in {"file", "config"} and node.file_path and node.hash
         }
         root = validate_project_root(repo.path)
         reader = SourceReader(root)

@@ -12,6 +12,26 @@ from backend.app.services.repo_scanner import RepoScanner
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("newline", [b"\n", b"\r\n", b"\r"])
+@pytest.mark.parametrize("filename,lines", [
+    ("service.py", [b"def handler():", b"    return True", b""]),
+    ("vite.config.ts", [b"export function handler() {", b"    return true;", b"}", b""]),
+])
+async def test_bot_retrieval_accepts_unchanged_source_with_any_line_ending(tmp_path: Path, newline: bytes, filename: str, lines: list[bytes]) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / filename).write_bytes(newline.join(lines))
+    store = SQLiteStore(tmp_path / "codewiki.sqlite3")
+    repo = store.upsert_repo(RepoScanner().describe(str(repo_dir)))
+    retriever = BotEvidenceRetriever(store, Settings(storage_dir=tmp_path / "storage", project_root=repo_dir))
+    try:
+        sources = await retriever.retrieve(repo.id, "handler")
+        assert any("handler" in item.source.snippet for item in sources)
+    finally:
+        store.close()
+
+
+@pytest.mark.asyncio
 async def test_bot_retrieval_reindexes_edited_code_and_uses_current_line_numbers(
     tmp_path: Path,
 ) -> None:
