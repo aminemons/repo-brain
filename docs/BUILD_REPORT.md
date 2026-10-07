@@ -1,5 +1,21 @@
 # Build report
 
+## Azure test deployment — 2026-10-07
+
+Deployed application revision `fc15532` to the existing Azure Linux VM under `/opt/repo-brain`, using the private server Compose profile. The app and Najm containers are healthy. The existing Clipflow services remain healthy in their separate Compose project. App access uses an SSH tunnel; port 8000 is bound to the server's loopback interface.
+
+Verified on the actual server:
+
+- Owner authentication succeeds; unauthenticated bot API requests are rejected.
+- The compiled frontend loads, and app-managed Git storage is writable.
+- Najm renders a real PNG with decoded pixels and dimensions 1000 × 708.
+- GitHub and OpenAI DNS/TLS connections succeed.
+- Server GitHub credentials list the owner's repositories. The browser accepts the owner login and displays the GitHub picker with 30 loaded repositories.
+
+No paid OpenAI request was made. The owner chooses a repository and supplies a model key to test a real answer. See [Azure access and maintenance](../deploy/AZURE_SETUP.md).
+
+The underlying application checks passed in [Linux CI run 37599760251](https://github.com/aminemons/repo-brain/actions/runs/37599760251). Local inherited backend checks passed with 227 tests and 3 skipped; the later configuration-evidence regression checks passed with 9 tests. Pinned owner repositories `kaisser-explore` and `pfe` passed all six evidence questions without executing project commands.
+
 ## Repository and interface repairs — 2026-10-06
 
 The bot interface now loads repository details and conversation history independently, offers retry controls, clears the previous transcript when switching conversations, and prevents overlapping conversation creation and message sends. Failed repository-plus-bot creation keeps the form values and explains how to reuse the registered repository. Authentication checks use a protected endpoint and typed HTTP errors; a rejected token is reported as a login problem.
