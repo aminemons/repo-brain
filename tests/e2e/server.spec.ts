@@ -117,8 +117,20 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await expect(page.locator(".bot-tool-panel")).toContainText("Change applied on its branch.");
 
   const repoTwo = `${storageDir}/e2e-fixtures/${runId}/repo-two`;
+  const registration = await page.request.post(`${baseURL}/api/repos`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    data: { path: repoTwo, name: "repo-two" },
+  });
+  expect(registration.ok()).toBeTruthy();
   await page.getByRole("button", { name: "Back to bots" }).click();
-  await createBot(page, repoTwo, "repo-two", "E2E Repo Two", "e2e-browser-model");
+  await page.getByRole("button", { name: "Browse GitHub repositories" }).click();
+  await expect(page.getByRole("button", { name: "Open bot for e2e-owner/repo-one" })).toBeVisible();
+  await page.getByRole("button", { name: "Load more repositories" }).click();
+  await page.getByLabel("Filter loaded GitHub repositories").fill("repo-two");
+  await page.getByRole("button", { name: "Select e2e-owner/repo-two" }).click();
+  await page.getByLabel("Bot name").fill("E2E Repo Two");
+  await page.getByLabel("OpenAI model ID").fill("e2e-browser-model");
+  await page.getByRole("button", { name: "Create bot" }).click();
   await expect(page.getByRole("heading", { name: "E2E Repo Two", level: 1 })).toBeVisible({ timeout: 180_000 });
   const secondBotUrl = page.url();
   await expect(page.getByText("Your conversations will appear here.")).toBeVisible();
@@ -136,6 +148,10 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await expect(page.getByText("Deterministic answer for SECOND_BOT_MARKER.", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Deterministic answer: the zeta initializer prepares the startup state.", { exact: true }).first()).toBeVisible();
   expect(secondBotUrl).not.toBe(firstBotUrl);
+  await page.getByRole("button", { name: "Back to bots" }).click();
+  await page.getByRole("button", { name: "Browse GitHub repositories" }).click();
+  await page.getByRole("button", { name: "Open bot for e2e-owner/repo-one" }).click();
+  await expect(page.getByRole("heading", { name: "E2E Repo One Updated", level: 1 })).toBeVisible();
 });
 
 async function createBot(

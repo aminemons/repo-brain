@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Self
 
@@ -128,6 +129,7 @@ def _install_test_providers() -> None:
     from backend.app.config import get_settings
     from backend.app.services.bot_changes import service as changes_service
     from backend.app.services.bots import service as bots_service
+    from backend.app.services.github import discovery
 
     settings = get_settings()
     if not settings.auth_token:
@@ -139,6 +141,34 @@ def _install_test_providers() -> None:
     changes_service.httpx.post = (  # type: ignore[assignment]
         lambda *args, **kwargs: _FakeProposalResponse()
     )
+    discovery.GitHubDiscoveryService.list_repositories = _fixture_github_repositories
+
+
+def _fixture_github_repositories(self: object, page: int, per_page: int) -> Any:
+    from backend.app.database import get_store
+    from backend.app.schemas.github import GitHubRepositoriesResponse, GitHubRepository
+    from backend.app.services.bots import BotService
+
+    name = "repo-one" if page == 1 else "repo-two"
+    root = get_settings_for_fixture_root() / name
+    store = get_store()
+    repo = next((item for item in store.list_repos() if Path(item.path).resolve() == root), None)
+    bots = BotService().list_bots()
+    bot = next((item for item in bots if repo and item.repo_id == repo.id), None)
+    return GitHubRepositoriesResponse(
+        configured=True, account="e2e-owner", next_page=2 if page == 1 else None,
+        repositories=[GitHubRepository(
+            full_name=f"e2e-owner/{name}", name=name, url=f"https://github.com/e2e-owner/{name}",
+            private=True, default_branch="main", language="Python", archived=False,
+            repo_id=repo.id if repo else None, bot_id=bot.id if bot else None,
+        )],
+    )
+
+
+def get_settings_for_fixture_root() -> Path:
+    from backend.app.config import get_settings
+
+    return (get_settings().storage_dir / "e2e-fixtures" / os.environ["E2E_RUN_ID"]).resolve()
 
 
 def main() -> None:

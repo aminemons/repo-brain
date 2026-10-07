@@ -38,11 +38,13 @@ jobs:
           backend/app/schemas/bots.py backend/app/schemas/bot_changes.py
           backend/app/services/bots backend/app/services/bot_changes
           backend/app/services/repo_scanner tests/backend/test_repo_registration.py
+          backend/app/api/github.py backend/app/schemas/github.py backend/app/services/github
+          tests/backend/test_github_discovery.py tests/e2e/server.py
           tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py
       - name: Check backend types
         run: uv run mypy backend/app
       - name: Test repository chat and Git workflows
-        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py tests/backend/test_repo_registration.py tests/backend/test_repo_scanner.py renderer/tests -q
+        run: uv run pytest tests/backend/test_bots_api.py tests/backend/test_bot_changes.py tests/backend/test_bot_illustration.py tests/backend/test_bot_retrieval.py tests/backend/test_github_discovery.py tests/backend/test_repo_registration.py tests/backend/test_repo_scanner.py renderer/tests -q
       - name: Run inherited suite when requested
         if: inputs.full_suite == true
         run: uv run pytest -q
