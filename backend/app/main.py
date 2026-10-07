@@ -13,6 +13,7 @@ from backend.app.api import (
     bot_changes,
     bots,
     files,
+    github,
     graph,
     project_brain,
     repos,
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(ask.router, prefix="/api/repos", tags=["ask"])
     app.include_router(runs.router, prefix="/api/repos", tags=["runs"])
     app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
+    app.include_router(github.router, prefix="/api/github", tags=["github"])
     app.include_router(project_brain.router, prefix="/api/repos", tags=["project-brain"])
     app.include_router(bots.router, prefix="/api/bots", tags=["bots"])
     app.include_router(bot_changes.router, prefix="/api/bots", tags=["bot-changes"])

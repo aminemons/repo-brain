@@ -54,7 +54,7 @@ class ProjectSecurityMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except ValueError as exc:
             response = JSONResponse({"detail": str(exc)}, status_code=400)
-        if path == "/api/bots" or path.startswith("/api/bots/"):
+        if path == "/api/bots" or path.startswith(("/api/bots/", "/api/github/")):
             response.headers["Cache-Control"] = "no-store"
         if path.startswith("/api/") and path != "/api/health":
             # Do not log queries, credentials, excerpts, or user-supplied paths.
