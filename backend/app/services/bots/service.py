@@ -37,6 +37,7 @@ from backend.app.services.bots.illustration import (
     build_evidence_map,
 )
 from backend.app.services.bots.models import BotConversationRecord, BotMessageRecord, BotRecord
+from backend.app.services.bots.provider import BotProviderError, generate_text
 from backend.app.services.bots.retrieval import BotEvidence, BotEvidenceRetriever, format_evidence
 from backend.app.services.graphrag import GraphRAGRetriever
 from backend.app.services.project_brain.service import ProjectBrainService
@@ -44,20 +45,12 @@ from backend.app.services.project_brain.sources import redact_source_text
 from backend.app.services.project_policy import is_sensitive_path, validate_project_root
 from backend.app.services.repo_metadata import read_repo_metadata
 
-DEFAULT_MODEL = "gpt-5.5"
+DEFAULT_MODEL = "ollama/qwen2.5-coder:0.5b"
 MAX_HISTORY_MESSAGES = 12
 MAX_HISTORY_CHARS = 20_000
 MAX_REFRESH_DOCUMENTS = 100
 _SCHEMA_LOCK = threading.Lock()
 _SCHEMA_ENGINES: weakref.WeakSet[Engine] = weakref.WeakSet()
-
-
-class BotProviderError(RuntimeError):
-    """A safe, actionable provider error with no retained request or key details."""
-
-    def __init__(self, status_code: int, message: str) -> None:
-        self.status_code = status_code
-        super().__init__(message)
 
 
 def _now() -> str:
@@ -257,7 +250,7 @@ class BotService:
         conversation_id: str,
         message: str,
         mode: str,
-        api_key: str,
+        api_key: str | None,
     ) -> BotMessage:
         bot = self.get_bot(bot_id)
         self._conversation_for_bot(bot_id, conversation_id)
@@ -270,7 +263,7 @@ class BotService:
         conversation_id: str,
         message: str,
         mode: str,
-        api_key: str,
+        api_key: str | None,
     ) -> BotMessage:
         """Answer with a one-request key; only user/assistant text and evidence are persisted."""
         history = self._history(conversation_id)
@@ -318,22 +311,27 @@ class BotService:
         model_input.append({"role": "user", "content": user_message})
 
         try:
-            async with AsyncOpenAI(
-                api_key=api_key,
-                base_url="https://api.openai.com/v1",
-                timeout=60.0,
-                max_retries=0,
-            ) as client:
-                response = await client.responses.create(
-                    model=bot.model,
-                    instructions=instructions,
-                    input=cast(ResponseInputParam, model_input),
-                    store=False,
-                    max_output_tokens=1600,
-                )
-                answer = response.output_text.strip()
-                if not answer:
-                    raise RuntimeError("The model returned an empty response")
+            if bot.model.startswith("ollama/"):
+                answer = await generate_text(bot.model, instructions, model_input, api_key)
+            else:
+                if not api_key:
+                    raise BotProviderError(400, "An API key is required for the selected OpenAI model.")
+                async with AsyncOpenAI(
+                    api_key=api_key,
+                    base_url="https://api.openai.com/v1",
+                    timeout=60.0,
+                    max_retries=0,
+                ) as client:
+                    response = await client.responses.create(
+                        model=bot.model,
+                        instructions=instructions,
+                        input=cast(ResponseInputParam, model_input),
+                        store=False,
+                        max_output_tokens=1600,
+                    )
+                    answer = response.output_text.strip()
+                    if not answer:
+                        raise RuntimeError("The model returned an empty response")
         except APIStatusError as exc:
             raise self._provider_error(exc.status_code) from None
         except APIError:

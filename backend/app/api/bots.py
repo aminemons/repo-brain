@@ -140,7 +140,7 @@ async def send_message(
             conversation_id,
             payload.message,
             payload.mode,
-            payload.api_key.get_secret_value(),
+            payload.api_key.get_secret_value() if payload.api_key is not None else None,
         )
     except ValueError as exc:
         raise _http_error(exc) from exc

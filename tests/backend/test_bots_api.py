@@ -144,7 +144,12 @@ def test_bot_first_message_indexes_locally_and_persists_without_key(
 
             bot_response = client.post(
                 "/api/bots",
-                json={"repo_id": repo_id, "name": "Fixture Bot", "instructions": "Be concise."},
+                json={
+                    "repo_id": repo_id,
+                    "name": "Fixture Bot",
+                    "instructions": "Be concise.",
+                    "model": "gpt-5.5",
+                },
             )
             assert bot_response.status_code == 201, bot_response.text
             bot = bot_response.json()

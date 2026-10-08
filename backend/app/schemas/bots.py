@@ -9,7 +9,7 @@ class BotCreateRequest(BaseModel):
     repo_id: str = Field(min_length=1, max_length=200)
     name: str = Field(min_length=1, max_length=120)
     instructions: str = Field(default="", max_length=8_000)
-    model: str = Field(default="gpt-5.5", min_length=1, max_length=160)
+    model: str = Field(default="ollama/qwen2.5-coder:0.5b", min_length=1, max_length=160)
 
 
 class BotUpdateRequest(BaseModel):
@@ -81,7 +81,7 @@ class ConversationDetail(BaseModel):
 class BotMessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=12_000)
     mode: Literal["explain", "teach", "illustrate"] = "explain"
-    api_key: SecretStr = Field(min_length=1, max_length=512)
+    api_key: SecretStr | None = Field(default=None, min_length=1, max_length=512)
 
 
 class BotRefreshResponse(BaseModel):
