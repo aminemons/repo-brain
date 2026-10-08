@@ -141,6 +141,74 @@ def test_propose_apply_uses_isolated_worktree_and_preserves_base_checkout(
         assert "sk-test-one-time-key" not in json.dumps(stored.files)
 
 
+def test_local_model_proposes_changes_without_an_api_key(bot_fixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.app.services.bots import provider
+
+    with bot_fixture.store.orm_session() as session:
+        bot = session.get(BotRecord, "fixture-bot")
+        assert bot is not None
+        bot.model = "ollama/qwen2.5-coder:7b"
+    calls: list[dict[str, Any]] = []
+
+    async def generate_text(model: str, instructions: str, input_messages: list[dict[str, Any]], api_key=None) -> str:
+        calls.append({"model": model, "instructions": instructions, "messages": input_messages, "api_key": api_key})
+        return json.dumps({
+            "summary": "Update answer behavior and docs",
+            "files": [
+                {"path": "src/app.py", "action": "update", "content": "def answer():\n    return 42\n"},
+                {"path": "README.md", "action": "update", "content": "# Fixture\n\nThe answer is 42.\n"},
+            ],
+        })
+
+    monkeypatch.setattr(provider, "generate_text", generate_text)
+    proposal = BotChangeService(bot_fixture.settings).propose("fixture-bot", "Return 42", None)
+
+    assert proposal["status"] == "proposed"
+    assert calls[0]["model"] == "ollama/qwen2.5-coder:7b"
+    assert calls[0]["api_key"] is None
+    assert calls[0]["messages"][0]["role"] == "user"
+
+
+def test_local_model_drafts_documentation_without_an_api_key(
+    bot_fixture, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.app.services.bots import provider
+
+    with bot_fixture.store.orm_session() as session:
+        bot = session.get(BotRecord, "fixture-bot")
+        assert bot is not None
+        bot.model = "ollama/qwen2.5-coder:7b"
+    source_path = bot_fixture.repo / "src" / "app.py"
+    source_path.write_text("def answer():\n    return 2\n", encoding="utf-8")
+    _git(bot_fixture.repo, "add", "src/app.py")
+    _git(bot_fixture.repo, "commit", "-m", "change source")
+    calls: list[dict[str, Any]] = []
+
+    async def generate_text(
+        model: str, instructions: str, input_messages: list[dict[str, Any]], api_key=None,
+    ) -> str:
+        calls.append({"model": model, "api_key": api_key, "messages": input_messages})
+        return json.dumps({
+            "summary": "Document the changed answer",
+            "files": [{
+                "path": "README.md", "action": "update",
+                "content": "# Fixture\n\nThe answer function now returns 2.\n",
+            }],
+        })
+
+    monkeypatch.setattr(provider, "generate_text", generate_text)
+    service = BotChangeService(bot_fixture.settings)
+    status = service.check_documentation("fixture-bot", bot_fixture.base)
+    assert status["queued_count"] == 1
+
+    draft = service.propose_documentation("fixture-bot", None, ["src/app.py"])
+
+    assert draft["status"] == "proposed"
+    assert draft["documentation_sources"] == ["src/app.py"]
+    assert calls[0]["model"] == "ollama/qwen2.5-coder:7b"
+    assert calls[0]["api_key"] is None
+
+
 @pytest.mark.parametrize("server_token", [False, True])
 def test_publish_uses_noninteractive_stubbed_git_and_gh(bot_fixture, monkeypatch: pytest.MonkeyPatch, server_token: bool) -> None:
     import shutil

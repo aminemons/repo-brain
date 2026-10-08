@@ -6,16 +6,16 @@ Each bot is tied to one repository. Its link, instructions, conversations, chang
 
 1. Add the local checkout of a repository through Repos. Choose only repositories you want to use.
 2. Open Bots and create a bot for that repository.
-3. Open its dedicated link and enter your own OpenAI API key and a model available to your account.
+3. Open its dedicated link and select a model. OpenAI models need your API key; local models use the `ollama/` prefix (for example, `ollama/qwen2.5-coder:7b`) and need no key.
 4. Start a conversation to explain code or teach the project. The first message indexes a fresh repository automatically. Refresh the index after local changes.
 
-The model field must contain an OpenAI API model ID that your account can use. A bot name or instruction such as `doit` is not a model ID. Provider failures now explain whether to check the key, model, available quota, or connection.
+For OpenAI, the model field must contain an API model ID that your account can use. For local inference, use `ollama/<model-name>` and make that model available to the configured Ollama service. A bot name or instruction such as `doit` is not a model ID. Provider failures now explain whether to check the key, model, available quota, or connection.
 
-The OpenAI key stays in page memory and is sent to the application's backend only for the requested AI operation. The backend calls OpenAI; selected, redacted project excerpts and conversation context leave your machine for those requests. Clearing the key or reloading the page requires entering it again. The application does not store the key in its database or repository. OpenAI API usage is billed to the supplied key's account.
+The OpenAI key stays in page memory and is sent to the application's backend only for the requested AI operation. The backend calls OpenAI; selected, redacted project excerpts and conversation context leave your machine for those requests. Clearing the key or reloading the page requires entering it again. The application does not store the key in its database or repository. OpenAI API usage is billed to the supplied key's account. Local `ollama/` models send requests to the configured local inference endpoint and do not use or forward an OpenAI key.
 
-The original local-only Ask workflow remains available. Bot requests with an explicitly supplied OpenAI key use their own provider path.
+The original local-only Ask workflow remains available. Bot requests use the selected provider: OpenAI with a supplied key or a local `ollama/` model without one.
 
-Provider requests use the Responses API with `store: false`. This disables stored response application state; provider data handling still follows the account's [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data). See the [Responses API guide](https://developers.openai.com/api/docs/guides/migrate-to-responses) for the request contract.
+OpenAI provider requests use the Responses API with `store: false`. This disables stored response application state; provider data handling still follows the account's [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data). See the [Responses API guide](https://developers.openai.com/api/docs/guides/migrate-to-responses) for the request contract. Local model requests stay within the configured Ollama service.
 
 ## Code changes
 

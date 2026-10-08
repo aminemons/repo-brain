@@ -40,7 +40,8 @@ async def propose_change(bot_id: str, payload: BotChangeRequest) -> dict[str, An
     try:
         async with repo_write_lock(bot_id):
             return await run_blocking(
-                _service().propose, bot_id, payload.request, payload.api_key.get_secret_value()
+                _service().propose, bot_id, payload.request,
+                payload.api_key.get_secret_value() if payload.api_key else None,
             )
     except ValueError as exc:
         raise _raise_http(exc) from exc
@@ -94,7 +95,8 @@ async def propose_documentation(bot_id: str, payload: DocumentationProposalReque
     try:
         async with repo_write_lock(bot_id):
             return await run_blocking(
-                _service().propose_documentation, bot_id, payload.api_key.get_secret_value(), payload.paths
+                _service().propose_documentation, bot_id,
+                payload.api_key.get_secret_value() if payload.api_key else None, payload.paths
             )
     except ValueError as exc:
         raise _raise_http(exc) from exc

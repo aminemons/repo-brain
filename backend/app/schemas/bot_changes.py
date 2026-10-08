@@ -7,11 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 class BotChangeRequest(BaseModel):
     request: str = Field(min_length=1, max_length=8_000)
-    api_key: SecretStr
+    api_key: SecretStr | None = Field(default=None, min_length=1, max_length=512)
 
     @field_validator("api_key")
     @classmethod
-    def nonempty_key(cls, value: SecretStr) -> SecretStr:
+    def nonempty_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
         if not value.get_secret_value().strip():
             raise ValueError("An API key is required.")
         return value
@@ -75,12 +77,14 @@ class DocumentationCheckResult(DocumentationStatus):
 
 
 class DocumentationProposalRequest(BaseModel):
-    api_key: SecretStr
+    api_key: SecretStr | None = Field(default=None, min_length=1, max_length=512)
     paths: list[str] = Field(default_factory=list, max_length=20)
 
     @field_validator("api_key")
     @classmethod
-    def nonempty_key(cls, value: SecretStr) -> SecretStr:
+    def nonempty_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
         if not value.get_secret_value().strip():
             raise ValueError("An API key is required.")
         return value
