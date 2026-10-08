@@ -142,6 +142,15 @@ export function App() {
     window.history.pushState(null, "", "/bots");
   }, []);
 
+  const openBotsForRepo = useCallback((repoId: string) => {
+    if (!repoId) return;
+    setSelectedRepoId(repoId);
+    setActiveSection("bots");
+    setActiveBotId(null);
+    const query = new URLSearchParams({ repo_id: repoId });
+    window.history.pushState(null, "", `/bots?${query.toString()}`);
+  }, []);
+
   const handleSelectedRepoChange = useCallback(
     (repoId: string) => {
       setSelectedRepoId(repoId);
@@ -297,6 +306,7 @@ export function App() {
                 <AskPage
                   selectedRepoId={selectedRepoId}
                   onRepoChange={handleSelectedRepoChange}
+                  onOpenBots={openBotsForRepo}
                   isActiveSection
                 />
               </Suspense>
@@ -352,7 +362,7 @@ function readStoredTheme(): ThemeMode {
 function routeFromLocation(): { section: WorkspaceSection; repoId?: string; botId?: string } {
   const pathSegments = window.location.pathname.split("/").filter(Boolean).map(decodeURIComponent);
   if (pathSegments[0] === "bots") {
-    return { section: "bots", botId: pathSegments[1] };
+    return { section: "bots", botId: pathSegments[1], repoId: new URLSearchParams(window.location.search).get("repo_id") ?? undefined };
   }
   if (pathSegments[0] === "repos") {
     const repoId = pathSegments[1];

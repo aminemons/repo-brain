@@ -3,6 +3,41 @@
   gap: 10px;
 }
 
+.ask-mode-help {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  max-width: 38ch;
+}
+
+.ask-bot-link {
+  background: var(--color-accent-fill);
+  border: 1px solid var(--color-border-medium);
+  border-radius: 5px;
+  color: var(--color-accent-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  margin: 12px 0 4px;
+  min-height: 36px;
+  padding: 7px 10px;
+  text-align: left;
+}
+
+.ask-bot-link:hover:not(:disabled),
+.ask-bot-link:focus-visible {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent-fill);
+  outline-offset: 1px;
+}
+
+.ask-bot-link:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
 .ask-form input,
 .ask-form select {
   background: var(--color-input-bg);

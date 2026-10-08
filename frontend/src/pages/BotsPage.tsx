@@ -15,7 +15,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
   const [bots, setBots] = useState<Bot[]>([]);
   const [loadingBots, setLoadingBots] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [repoId, setRepoId] = useState("");
+  const [repoId, setRepoId] = useState(() => new URLSearchParams(window.location.search).get("repo_id") ?? "");
   const [addRepository, setAddRepository] = useState(false);
   const [githubPickerOpen, setGithubPickerOpen] = useState(false);
   const [repoPath, setRepoPath] = useState("");
@@ -51,6 +51,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
 
   const repoById = useMemo(() => new Map(repos.map((repo) => [repo.id, repo])), [repos]);
   const occupiedRepoIds = useMemo(() => new Set(bots.map((bot) => bot.repo_id)), [bots]);
+  const requestedRepoBot = bots.find((bot) => bot.repo_id === repoId);
   const availableRepos = repos.filter((repo) => !occupiedRepoIds.has(repo.id));
   const groupedBots = useMemo(() => {
     const groups = new Map<string, { repo: RepoSummary | undefined; bots: Bot[] }>();
@@ -194,6 +195,11 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
         <section className="bot-create-panel" aria-labelledby="create-bot-title">
           <div className="bots-section-title"><h2 id="create-bot-title">Create a bot</h2></div>
           <p className="bot-form-intro">Select a repository or add a local folder or Git URL. The index is prepared before the conversation opens.</p>
+          {requestedRepoBot ? (
+            <div className="bots-message" role="status">
+              This repository already has a bot: <button type="button" className="bot-text-link" onClick={() => onOpenBot(requestedRepoBot.id)}>Open {requestedRepoBot.name}</button>
+            </div>
+          ) : null}
           <form className="bot-create-form" onSubmit={(event) => void handleCreate(event)}>
             {!addRepository ? (
               <>
