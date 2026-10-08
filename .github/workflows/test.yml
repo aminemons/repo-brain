@@ -90,6 +90,12 @@ jobs:
         run: bash scripts/server.sh up
       - name: Verify authentication, storage, network access and real Najm rendering
         run: bash scripts/server.sh check
+      - name: Verify free local generation without a provider key
+        run: docker compose --env-file deploy/server.env -f compose.server.yml exec -T app python - < scripts/check-local-inference.py
+      - name: Release build cache before installing Chromium
+        run: |
+          docker builder prune --all --force
+          df -h .
       - name: Collect render fixture
         if: success()
         run: docker compose --env-file deploy/server.env -f compose.server.yml exec -T app python -c "import sys; sys.stdout.buffer.write(open('/tmp/najm-smoke.png', 'rb').read())" > najm-smoke.png
