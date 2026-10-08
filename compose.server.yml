@@ -15,6 +15,7 @@ services:
       CODEWIKI_PRIVACY_MODE: local_only
       CODEWIKI_NAJM_ENABLED: "true"
       CODEWIKI_NAJM_ENDPOINT: http://najm:8080
+      CODEWIKI_BOT_LOCAL_ENDPOINT: http://ollama:11434
       GH_TOKEN: ${GH_TOKEN:-}
       GH_PROMPT_DISABLED: "1"
       GIT_TERMINAL_PROMPT: "0"
@@ -29,6 +30,7 @@ services:
     networks:
       - outbound
       - rendering
+      - inference
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -44,6 +46,31 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 40s
+      retries: 3
+
+  ollama:
+    image: ${OLLAMA_IMAGE:-ollama/ollama@sha256:69f27594d8127cb43db1edcafa5e2d3cd8f88bdbc54a2cf3ceb11b8d138a24b1}
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_MAX_QUEUE: "4"
+      OLLAMA_KEEP_ALIVE: "0"
+      OLLAMA_CONTEXT_LENGTH: "4096"
+      OLLAMA_NO_CLOUD: "1"
+    volumes:
+      - local-models:/root/.ollama
+    networks: [inference, outbound]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 128
+    mem_limit: ${MODEL_MEMORY_LIMIT:-1400m}
+    cpus: ${MODEL_CPU_LIMIT:-2}
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, ollama, list]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
       retries: 3
 
   najm:
@@ -72,9 +99,12 @@ services:
 
 networks:
   outbound:
+  inference:
+    internal: true
   rendering:
     internal: true
 
 volumes:
   app-data:
   app-storage:
+  local-models:

@@ -44,7 +44,7 @@ fi
 chmod 600 deploy/server.env
 echo 'Enter CODEWIKI_AUTH_TOKEN from deploy/server.env in the app Settings page.'
 echo 'For private GitHub repositories, set GH_TOKEN in that file before starting.'
-echo 'OpenAI keys are entered in the bot page and are not deployment secrets.'
+echo 'The free local model needs no OpenAI key. OpenAI is an optional bot setting.'
 if [[ "$prepare_only" == true ]]; then
   bash scripts/server.sh config
 else

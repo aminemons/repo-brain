@@ -10,7 +10,7 @@ Keep an SSH tunnel running:
 ssh -N -L 8000:127.0.0.1:8000 -i /path/to/your/ssh-key clipflow@your-server-ip
 ```
 
-Open <http://127.0.0.1:8000/bots>. The page is served by Azure through SSH. Enter the owner token in **Settings**, then browse GitHub and choose a repository. Enter your OpenAI API key in its bot page when you want to send a message.
+Open <http://127.0.0.1:8000/bots>. The page is served by Azure through SSH. Enter the owner token in **Settings**, then browse GitHub and choose a repository. Keep **Local · free** selected to chat without an OpenAI key. OpenAI remains an optional model choice.
 
 ### Windows reconnection
 

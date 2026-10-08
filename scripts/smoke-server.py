@@ -104,7 +104,12 @@ def main() -> None:
     if not shutil.which("gh"):
         raise ValueError("GitHub CLI is missing from the application image")
     print("GitHub CLI: installed")
-    print("No model request was made. Enter your OpenAI key and model ID in a bot to test an answer.")
+    with urllib.request.urlopen("http://ollama:11434/api/tags", timeout=10) as response:
+        models = json.load(response).get("models", [])
+    if not any(item.get("name") == "qwen2.5-coder:0.5b" for item in models):
+        raise ValueError("Free local model is missing; run bash scripts/server.sh up")
+    print("Free local coding model: installed; no OpenAI key required")
+    print("No generation request was made by this smoke check.")
 
 
 if __name__ == "__main__":

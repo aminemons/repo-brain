@@ -7,12 +7,16 @@ compose=(docker compose --env-file deploy/server.env -f compose.server.yml)
 if grep -Eq '^PUBLIC_DOMAIN=[a-zA-Z0-9][a-zA-Z0-9.-]+$' deploy/server.env; then
   compose+=(-f compose.server.https.yml)
 fi
+prepare_model() {
+  echo 'Preparing the free local coding model (first download is about 400 MB).'
+  "${compose[@]}" exec -T ollama ollama pull qwen2.5-coder:0.5b
+}
 case "${1:-status}" in
   config) "${compose[@]}" config --quiet ;;
-  up) "${compose[@]}" up --build --detach --wait --wait-timeout 300 ;;
+  up) "${compose[@]}" up --build --detach --wait --wait-timeout 300; prepare_model ;;
   stop) "${compose[@]}" stop ;;
   status) "${compose[@]}" ps ;;
-  logs) "${compose[@]}" logs --tail 100 app najm ;;
+  logs) "${compose[@]}" logs --tail 100 app najm ollama ;;
   update)
     [[ -z "$(git status --porcelain --untracked-files=all)" ]] || { echo 'Commit or preserve local source changes before updating.' >&2; exit 1; }
     git pull --ff-only
