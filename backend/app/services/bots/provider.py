@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import os
 from collections.abc import Mapping, Sequence
+from typing import Any
 
 import httpx
-
-_INFERENCE_SLOT = asyncio.Semaphore(1)
 
 
 class BotProviderError(RuntimeError):
@@ -64,6 +62,7 @@ async def generate_text(
     instructions: str,
     input_messages: Sequence[Mapping[str, object]],
     api_key: str | None = None,
+    output_schema: dict[str, Any] | None = None,
 ) -> str:
     """Generate text with the configured private Ollama endpoint."""
     del api_key  # Local inference never consumes or forwards BYOK credentials.
@@ -73,15 +72,23 @@ async def generate_text(
         {"role": "system", "content": instructions},
         *_bounded_messages(input_messages, max(0, 12_000 - len(instructions))),
     ]
-    body = {
+    options: dict[str, int | float] = {
+        "num_ctx": 4096,
+        "num_predict": 1024 if output_schema is not None else 512,
+        "num_thread": 2,
+        "temperature": 0.0,
+    }
+    body: dict[str, Any] = {
         "model": ollama_model,
         "messages": messages,
         "stream": False,
         "keep_alive": 0,
-        "options": {"num_ctx": 4096, "num_predict": 512, "num_thread": 2},
+        "options": options,
     }
+    if output_schema is not None:
+        body["format"] = output_schema
     try:
-        async with _INFERENCE_SLOT, httpx.AsyncClient(
+        async with httpx.AsyncClient(
             timeout=180.0, trust_env=False, follow_redirects=False
         ) as client:
             response = await client.post(f"{endpoint}/api/chat", json=body)

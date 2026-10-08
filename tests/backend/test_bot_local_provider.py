@@ -40,11 +40,48 @@ async def test_ollama_provider_posts_bounded_prompt_without_api_key(monkeypatch)
     assert payload["model"] == "qwen2.5-coder:0.5b"
     assert payload["stream"] is False
     assert payload["keep_alive"] == 0
-    assert payload["options"] == {"num_ctx": 4096, "num_predict": 512, "num_thread": 2}
+    assert payload["options"] == {
+        "num_ctx": 4096, "num_predict": 512, "num_thread": 2, "temperature": 0.0,
+    }
     assert payload["messages"][0] == {"role": "system", "content": "follow these rules"}
     user_messages = payload["messages"][1:]
     assert sum(len(message["content"]) for message in user_messages) <= 12_000
     assert user_messages[-2:] == [evidence, question]
+
+
+@pytest.mark.asyncio
+async def test_ollama_provider_uses_schema_for_structured_output(monkeypatch) -> None:
+    captured: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        captured.append(request)
+        return httpx.Response(200, json={"message": {"content": '{"ok":true}'}})
+
+    real_async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "backend.app.services.bots.provider.httpx.AsyncClient",
+        lambda **kwargs: real_async_client(transport=httpx.MockTransport(handler), **kwargs),
+    )
+    output_schema = {
+        "type": "object",
+        "properties": {"ok": {"type": "boolean"}},
+        "required": ["ok"],
+        "additionalProperties": False,
+    }
+
+    answer = await generate_text(
+        "ollama/qwen2.5-coder:7b",
+        "Return JSON",
+        [{"role": "user", "content": '{"task":"test"}'}],
+        output_schema=output_schema,
+    )
+
+    payload = json.loads(captured[0].content)
+    assert answer == '{"ok":true}'
+    assert payload["format"] == output_schema
+    assert payload["options"] == {
+        "num_ctx": 4096, "num_predict": 1024, "num_thread": 2, "temperature": 0.0,
+    }
 
 
 @pytest.mark.asyncio

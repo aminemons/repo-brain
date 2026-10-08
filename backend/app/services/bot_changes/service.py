@@ -307,29 +307,39 @@ def _request_proposal(
                              "repository_files": {path: redact_source_text(text) for path, text in context.items()}},
                             ensure_ascii=False)
     if model.startswith("ollama/"):
-        # The local provider bounds each user message to 12k characters. Keep the
-        # request and whole-file excerpts intact inside that budget.
-        local_instructions = redact_source_text(bot.instructions)[:1_000]
-        local_files: dict[str, str] = {}
-        for path, text in context.items():
-            candidate = json.dumps({
-                "bot": redact_source_text(bot.name),
-                "bot_instructions": local_instructions,
-                "request": redact_source_text(request),
-                "repository_files": {**local_files, path: redact_source_text(text)},
-            }, ensure_ascii=False)
-            if len(candidate) > 11_500:
-                continue
-            local_files[path] = text
-        input_text = json.dumps({
+        # Reserve the system prompt before fitting the complete user JSON into
+        # the provider's bounded input. Never let the provider truncate JSON.
+        local_instructions = redact_source_text(bot.instructions)
+        input_limit = max(0, 12_000 - len(instructions))
+        base_payload = {
             "bot": redact_source_text(bot.name),
             "bot_instructions": local_instructions,
             "request": redact_source_text(request),
-            "repository_files": {path: redact_source_text(text) for path, text in local_files.items()},
+            "repository_files": {},
+        }
+        input_text = json.dumps(base_payload, ensure_ascii=False)
+        if len(input_text) > input_limit:
+            raise ValueError(
+                "The request and bot instructions exceed the local model input limit. Shorten them and try again."
+            )
+        local_files: dict[str, str] = {}
+        for path, text in context.items():
+            candidate_files = {**local_files, path: redact_source_text(text)}
+            candidate = json.dumps({**base_payload, "repository_files": candidate_files}, ensure_ascii=False)
+            if len(candidate) > input_limit:
+                continue
+            local_files = candidate_files
+        input_text = json.dumps({
+            **base_payload,
+            "repository_files": local_files,
         }, ensure_ascii=False)
         try:
             output = asyncio.run(bot_provider.generate_text(
-                model, instructions, [{"role": "user", "content": input_text}], api_key=None,
+                model,
+                instructions,
+                [{"role": "user", "content": input_text}],
+                api_key=None,
+                output_schema=_schema(),
             ))
             return BotChangeProposal.model_validate_json(output)
         except (ValueError, RuntimeError):

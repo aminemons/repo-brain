@@ -150,8 +150,13 @@ def test_local_model_proposes_changes_without_an_api_key(bot_fixture, monkeypatc
         bot.model = "ollama/qwen2.5-coder:7b"
     calls: list[dict[str, Any]] = []
 
-    async def generate_text(model: str, instructions: str, input_messages: list[dict[str, Any]], api_key=None) -> str:
-        calls.append({"model": model, "instructions": instructions, "messages": input_messages, "api_key": api_key})
+    async def generate_text(
+        model: str, instructions: str, input_messages: list[dict[str, Any]], api_key=None, output_schema=None,
+    ) -> str:
+        calls.append({
+            "model": model, "instructions": instructions, "messages": input_messages,
+            "api_key": api_key, "output_schema": output_schema,
+        })
         return json.dumps({
             "summary": "Update answer behavior and docs",
             "files": [
@@ -167,6 +172,10 @@ def test_local_model_proposes_changes_without_an_api_key(bot_fixture, monkeypatc
     assert calls[0]["model"] == "ollama/qwen2.5-coder:7b"
     assert calls[0]["api_key"] is None
     assert calls[0]["messages"][0]["role"] == "user"
+    assert calls[0]["output_schema"]["type"] == "object"
+    prompt = json.loads(calls[0]["messages"][0]["content"])
+    assert prompt["request"] == "Return 42"
+    assert len(calls[0]["messages"][0]["content"]) <= 12_000 - len(calls[0]["instructions"])
 
 
 def test_local_model_drafts_documentation_without_an_api_key(
@@ -185,7 +194,7 @@ def test_local_model_drafts_documentation_without_an_api_key(
     calls: list[dict[str, Any]] = []
 
     async def generate_text(
-        model: str, instructions: str, input_messages: list[dict[str, Any]], api_key=None,
+        model: str, instructions: str, input_messages: list[dict[str, Any]], api_key=None, output_schema=None,
     ) -> str:
         calls.append({"model": model, "api_key": api_key, "messages": input_messages})
         return json.dumps({
@@ -207,6 +216,25 @@ def test_local_model_drafts_documentation_without_an_api_key(
     assert draft["documentation_sources"] == ["src/app.py"]
     assert calls[0]["model"] == "ollama/qwen2.5-coder:7b"
     assert calls[0]["api_key"] is None
+
+
+def test_local_model_rejects_request_that_would_truncate_json(
+    bot_fixture, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from backend.app.services.bots import provider
+
+    with bot_fixture.store.orm_session() as session:
+        bot = session.get(BotRecord, "fixture-bot")
+        assert bot is not None
+        bot.model = "ollama/qwen2.5-coder:7b"
+        bot.instructions = "instruction " * 700
+
+    async def unexpected_generate(*_args, **_kwargs) -> str:
+        raise AssertionError("The provider must not receive truncated JSON.")
+
+    monkeypatch.setattr(provider, "generate_text", unexpected_generate)
+    with pytest.raises(ValueError, match="exceed the local model input limit"):
+        BotChangeService(bot_fixture.settings).propose("fixture-bot", "request " * 1_000, None)
 
 
 @pytest.mark.parametrize("server_token", [False, True])
