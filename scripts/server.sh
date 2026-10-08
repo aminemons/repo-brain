@@ -8,8 +8,12 @@ if grep -Eq '^PUBLIC_DOMAIN=[a-zA-Z0-9][a-zA-Z0-9.-]+$' deploy/server.env; then
   compose+=(-f compose.server.https.yml)
 fi
 prepare_model() {
-  echo 'Preparing the free local coding model (first download is about 400 MB).'
-  "${compose[@]}" exec -T ollama ollama pull qwen2.5-coder:0.5b
+  if "${compose[@]}" exec -T ollama ollama show qwen2.5-coder:0.5b >/dev/null 2>&1; then
+    echo 'Free local coding model: ready.'
+  else
+    echo 'Preparing the free local coding model (first download is about 400 MB).'
+    "${compose[@]}" exec -T ollama ollama pull qwen2.5-coder:0.5b
+  fi
 }
 case "${1:-status}" in
   config) "${compose[@]}" config --quiet ;;
@@ -20,7 +24,8 @@ case "${1:-status}" in
   update)
     [[ -z "$(git status --porcelain --untracked-files=all)" ]] || { echo 'Commit or preserve local source changes before updating.' >&2; exit 1; }
     git pull --ff-only
-    "${compose[@]}" up --build --detach --wait --wait-timeout 300 ;;
+    "${compose[@]}" up --build --detach --wait --wait-timeout 300
+    prepare_model ;;
   check)
     "${compose[@]}" exec -T app python - < scripts/smoke-server.py
     ;;
