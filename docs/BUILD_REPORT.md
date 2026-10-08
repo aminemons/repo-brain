@@ -1,5 +1,18 @@
 # Build report
 
+## Free local inference (2026-10-08)
+
+Repository bots now default to `ollama/qwen2.5-coder:0.5b`. Chat, code proposals, and documentation drafts accept an omitted OpenAI key for local models. OpenAI remains an explicit alternative with a request-only key. Local requests omit retained OpenAI credentials.
+
+The existing Azure VM runs the 397 MB model in a private Ollama container with a 1400 MB memory limit, one parallel generation slot, a four-request queue, and immediate model unloading. Measured model-container memory during chat was about 590 MiB. No public inference port or new VM was created.
+
+A real question was sent through the owner's Clipflow bot without an API key. The answer appeared in the browser, and the conversation remained after reloading. The owner’s existing `amine` and `vmp` bots were switched to local inference. Authentication, writable Git storage, and an actual Najm render passed on Azure.
+
+Focused backend tests, Ruff, mypy, frontend lint, and frontend build pass. [GitHub run 37811880035](https://github.com/aminemons/repo-brain/actions/runs/37811880035) also passed both jobs, including real local chat, a schema-constrained proposal, and the existing browser workflow. CI releases its Docker build cache before installing Chromium to avoid exhausting the runner disk.
+
+Local proposals use Ollama’s JSON-schema output and keep complete request/file JSON within the input budget. Invalid output is rejected before applying changes. The small CPU model has limited answer and editing quality; its output still needs review. Azure VM costs remain separate from model inference.
+
+
 ## Azure test deployment — 2026-10-07
 
 Deployed application revision `fc15532` to the existing Azure Linux VM under `/opt/repo-brain`, using the private server Compose profile. The app and Najm containers are healthy. The existing Clipflow services remain healthy in their separate Compose project. App access uses an SSH tunnel; port 8000 is bound to the server's loopback interface.
