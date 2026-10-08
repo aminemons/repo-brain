@@ -21,7 +21,7 @@ async def ask_repo(repo_id: str, payload: AskRequest) -> AskResponse:
     if ModelRouter(settings).profile_for("qa").model == "provider/strong-coding-model":
         raise HTTPException(
             status_code=400,
-            detail="Use this repository's bot with your OpenAI key, or configure an Ask model on the server.",
+            detail="Use this repository's bot with the free local model, or configure an Ask model on the server.",
         )
     answerer = QuestionAnswerer(
         GraphRAGRetriever(store=store, settings=settings),

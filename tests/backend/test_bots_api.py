@@ -201,6 +201,16 @@ def test_bot_first_message_indexes_locally_and_persists_without_key(
             assert [item["role"] for item in detail.json()["messages"]] == ["user", "assistant"]
             assert test_key not in detail.text
 
+            missing_key_message = client.post(
+                f"/api/bots/{bot['id']}/conversations/{conversation_id}/messages",
+                json={"message": "OpenAI needs a key"},
+            )
+            assert missing_key_message.status_code == 400
+            assert "API key is required" in missing_key_message.json()["detail"]
+            assert client.get(
+                f"/api/bots/{bot['id']}/conversations/{conversation_id}"
+            ).json()["messages"] == detail.json()["messages"]
+
             index_failures.append(True)
             history_before_index_failure = detail.json()["messages"]
             index_failed_message = client.post(
@@ -287,6 +297,36 @@ def test_bot_first_message_indexes_locally_and_persists_without_key(
             refreshed = client.post(f"/api/bots/{bot['id']}/refresh")
             assert refreshed.status_code == 200, refreshed.text
             assert refreshed.json()["chunk_count"] >= 1
+
+            local_model = client.patch(
+                f"/api/bots/{bot['id']}", json={"model": "ollama/qwen2.5-coder:0.5b"}
+            )
+            assert local_model.status_code == 200
+
+            async def stub_local_generate_text(
+                model: str, instructions: str, input_messages: list[dict[str, object]],
+                api_key: str | None = None,
+            ) -> str:
+                assert model == "ollama/qwen2.5-coder:0.5b"
+                assert instructions
+                assert input_messages
+                assert api_key is None
+                return "The local model answered without a key [S1]."
+
+            monkeypatch.setattr(
+                "backend.app.services.bots.service.generate_text", stub_local_generate_text
+            )
+            local_message = client.post(
+                f"/api/bots/{bot['id']}/conversations/{conversation_id}/messages",
+                json={"message": "Answer with the local model"},
+            )
+            assert local_message.status_code == 200, local_message.text
+            assert "local model answered" in local_message.json()["content"]
+            persisted = client.get(
+                f"/api/bots/{bot['id']}/conversations/{conversation_id}"
+            ).json()["messages"]
+            assert persisted[-1]["role"] == "assistant"
+            assert persisted[-1]["content"] == local_message.json()["content"]
 
         database_bytes = (tmp_path / "bots.sqlite3").read_bytes()
         assert test_key.encode() not in database_bytes

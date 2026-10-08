@@ -23,6 +23,6 @@ def test_unconfigured_ask_directs_owner_to_bot_without_provider_request(monkeypa
         response = client.post("/repos/registered/ask", json={"question": "Explain the code"})
         assert response.status_code == 400
         assert "repository's bot" in response.json()["detail"]
-        assert "OpenAI key" in response.json()["detail"]
+        assert "free local model" in response.json()["detail"]
         missing = client.post("/repos/missing/ask", json={"question": "Explain the code"})
         assert missing.status_code == 404
