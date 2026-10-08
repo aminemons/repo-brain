@@ -12,6 +12,21 @@ ssh -N -L 8000:127.0.0.1:8000 -i /path/to/your/ssh-key clipflow@your-server-ip
 
 Open <http://127.0.0.1:8000/bots>. The page is served by Azure through SSH. Enter the owner token in **Settings**, then browse GitHub and choose a repository. Enter your OpenAI API key in its bot page when you want to send a message.
 
+### Windows reconnection
+
+The owner's computer has a task named `RepoBrain-Azure-Tunnel`. It checks the connection every two minutes and at login. If disconnected, it refreshes the dedicated Azure SSH rule for the computer's current public IPv4 address and starts a hidden SSH tunnel. It preserves strict host-key verification and permits SSH from one `/32` address. A healthy connection is left running.
+
+The task runs `scripts/keep-azure-tunnel.ps1` with a local JSON connection file. That file contains `localPort`, `serverAddress`, `userName`, `identityFile`, `knownHostsFile`, `azureCliPython`, `resourceGroup`, `nsgName`, and `ruleName`. Paths point to the existing SSH key, known-hosts file, and authenticated Azure CLI Python installation. Credentials remain in those tools' existing private files.
+
+To reconnect immediately or inspect a failure:
+
+```powershell
+Start-ScheduledTask -TaskName RepoBrain-Azure-Tunnel
+Get-ScheduledTaskInfo -TaskName RepoBrain-Azure-Tunnel
+```
+
+An expired Azure login needs renewal before the task can update the SSH rule. The browser is unavailable while the computer is offline; the Azure application continues running.
+
 The deployment saves its owner token and GitHub credential in the root-readable `/opt/repo-brain/deploy/server.env`. Keep that file out of source control and shared logs. The SSH network rule permits the deployment computer's IP; if that IP changes, update the rule to the new address with a `/32` prefix.
 
 ## Maintenance
