@@ -129,6 +129,7 @@ test("owner setup, repository bots, isolated history, Najm rendering, and review
   await page.getByLabel("Filter loaded GitHub repositories").fill("repo-two");
   await page.getByRole("button", { name: "Select e2e-owner/repo-two" }).click();
   await page.getByLabel("Bot name").fill("E2E Repo Two");
+  await page.getByLabel("Model provider").selectOption("openai");
   await page.getByLabel("OpenAI model ID").fill("e2e-browser-model");
   await page.getByRole("button", { name: "Create bot" }).click();
   await expect(page.getByRole("heading", { name: "E2E Repo Two", level: 1 })).toBeVisible({ timeout: 180_000 });
@@ -165,6 +166,7 @@ async function createBot(
   await page.getByLabel("Local folder or Git URL").fill(repositoryPath);
   await page.getByLabel(/^Display name/).fill(displayName);
   await page.getByLabel("Bot name").fill(botName);
+  await page.getByLabel("Model provider").selectOption("openai");
   await page.getByLabel("OpenAI model ID").fill(model);
   await page.getByRole("button", { name: "Create bot" }).click();
 }

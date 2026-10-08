@@ -48,12 +48,12 @@ export function AskPage({
         <span className="eyebrow">Ask</span>
         <h2>{qaModelConfigured === false ? "Ask with a repository bot" : "Legacy GraphRAG"}</h2>
         {qaModelConfigured === false ? (
-          <p className="ask-mode-help">Use your repository bot to ask with your OpenAI key. The server Ask model has not been configured.</p>
+          <p className="ask-mode-help">Use a repository bot with a local free model or your OpenAI key. The server Ask model has not been configured.</p>
         ) : (
           <p className="ask-mode-help">Uses the server-configured model. For an OpenAI key you provide, use a repository bot.</p>
         )}
         <button type="button" className="ask-bot-link" disabled={!selectedRepoId} onClick={() => onOpenBots(selectedRepoId)}>
-          Open or create a bot for this repository
+          Open or create a local or OpenAI bot
         </button>
       </header>
 

@@ -28,6 +28,7 @@ import {
   type BotRefreshResult
 } from "../api/bots";
 import { getRepos } from "../api/repos";
+import { isLocalModel, ModelSelector } from "../bots/ModelSelector";
 
 type BotMode = "explain" | "teach" | "illustrate";
 type BotTab = "chat" | "changes" | "documentation";
@@ -174,7 +175,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
   }, [botId, conversationId, conversationLoadRevision]);
 
   useEffect(() => {
-    if (!autoDraft || !apiKey.trim()) return;
+    if (!autoDraft || (!isLocalModel(bot?.model) && !apiKey.trim())) return;
     const controller = new AbortController();
     let checking = false;
     const poll = async () => {
@@ -189,7 +190,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
         if (commit && hasPending && commit !== autoDraftCommitRef.current && current.proposed_commit !== commit) {
           autoDraftCommitRef.current = commit;
           const paths = pendingPaths.slice(0, 20);
-          await proposeBotDocumentation(botId, apiKey, paths, controller.signal);
+          await proposeBotDocumentation(botId, isLocalModel(bot?.model) || !apiKey.trim() ? undefined : apiKey, paths, controller.signal);
           if (!controller.signal.aborted) {
             setError(null);
             setAutoDraftMessage(`Documentation draft prepared for ${commit.slice(0, 12)}. Review it under Code changes.`);
@@ -205,7 +206,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
     void poll();
     const intervalId = window.setInterval(() => void poll(), 60_000);
     return () => { controller.abort(); window.clearInterval(intervalId); };
-  }, [apiKey, autoDraft, botId]);
+  }, [apiKey, autoDraft, bot?.model, botId]);
 
   useEffect(() => () => { messageAbortRef.current?.abort(); }, []);
   useEffect(() => () => { refreshAbortRef.current?.abort(); }, []);
@@ -280,7 +281,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
   const submitMessage = async (event: FormEvent) => {
     event.preventDefault();
     const text = message.trim();
-    if (!text || !conversationId || !apiKey.trim() || sending || refreshingKnowledge) return;
+    if (!text || !conversationId || (!isLocalModel(bot?.model) && !apiKey.trim()) || sending || refreshingKnowledge) return;
     setSending(true);
     setProcessingMode(mode);
     setError(null);
@@ -288,7 +289,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
     messageAbortRef.current?.abort();
     messageAbortRef.current = controller;
     try {
-      const answer = await sendBotMessage(botId, conversationId, { message: text, mode, api_key: apiKey }, controller.signal);
+      const answer = await sendBotMessage(botId, conversationId, { message: text, mode, ...(!isLocalModel(bot?.model) && apiKey.trim() ? { api_key: apiKey } : {}) }, controller.signal);
       if (controller.signal.aborted || activeConversationRef.current !== conversationId) return;
       setMessage((current) => current === text ? "" : current);
       setDetail((current) => current?.conversation.id === conversationId
@@ -301,7 +302,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
     } catch (sendError) {
       if (!controller.signal.aborted && activeConversationRef.current === conversationId) {
         const detail = sendError instanceof Error ? sendError.message : "Could not send message.";
-        setError(/model request failed|invalid model|model.+not found|unsupported.+model/i.test(detail)
+        setError(!isLocalModel(bot?.model) && /model request failed|invalid model|model.+not found|unsupported.+model/i.test(detail)
           ? `OpenAI could not complete a request with model “${bot?.model ?? "unknown"}”. Check that the model ID is valid and your key can access it.`
           : detail);
       }
@@ -386,7 +387,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
               <div className="bot-settings-heading"><strong>Bot settings</strong><button type="button" className="bot-settings-close" onClick={() => setSettingsOpen(false)}>Close</button></div>
               <label className="field"><span>Name</span><input value={botName} onChange={(event) => setBotName(event.target.value)} required maxLength={120} /></label>
               <label className="field"><span>Instructions</span><textarea value={botInstructions} onChange={(event) => setBotInstructions(event.target.value)} rows={3} maxLength={4000} /></label>
-              <label className="field"><span>OpenAI model ID</span><input value={botModel} onChange={(event) => setBotModel(event.target.value)} required /><small className="field-help">Use an ID available to your key, such as gpt-5.5. Custom IDs are sent as entered.</small></label>
+              <ModelSelector model={botModel} onChange={setBotModel} />
               {settingsMessage ? <div className={settingsMessage === "Bot settings saved." ? "bot-notice" : "bot-error"} role={settingsMessage === "Bot settings saved." ? "status" : "alert"}>{settingsMessage}</div> : null}
               <button className="bots-primary-button" type="submit" disabled={!botName.trim() || !botModel.trim() || savingSettings}>{savingSettings ? "Saving…" : "Save settings"}</button>
             </form> : null}
@@ -407,6 +408,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
                 refreshingKnowledge={refreshingKnowledge}
                 hasRefreshed={refreshResult !== null}
                 apiKey={apiKey}
+                requiresApiKey={!isLocalModel(bot.model)}
                 onApiKeyChange={(value) => { setApiKey(value); if (value.trim()) setApiKeyPrompt(""); else setAutoDraft(false); }}
                 mode={mode}
                 onModeChange={setMode}
@@ -420,8 +422,8 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
                 onSubmit={(event) => void submitMessage(event)}
               />
             ) : activeTab === "changes" ? (
-              <ChangesPanel botId={botId} apiKey={apiKey} onApiKeyRequired={() => { setApiKeyPrompt("Enter your OpenAI API key to request a code change."); setFocusApiKey(true); setActiveTab("chat"); }} />
-            ) : <DocumentationPanel botId={botId} apiKey={apiKey} autoDraft={autoDraft} onAutoDraftChange={(value) => { setAutoDraft(value); autoDraftCommitRef.current = null; setAutoDraftMessage(null); setError(null); }} onApiKeyRequired={() => { setApiKeyPrompt("Enter your OpenAI API key to draft documentation."); setFocusApiKey(true); setActiveTab("chat"); }} />}
+              <ChangesPanel botId={botId} apiKey={apiKey} requiresApiKey={!isLocalModel(bot.model)} onApiKeyRequired={() => { setApiKeyPrompt("Enter your OpenAI API key to request a code change."); setFocusApiKey(true); setActiveTab("chat"); }} />
+            ) : <DocumentationPanel botId={botId} apiKey={apiKey} requiresApiKey={!isLocalModel(bot.model)} autoDraft={autoDraft} onAutoDraftChange={(value) => { setAutoDraft(value); autoDraftCommitRef.current = null; setAutoDraftMessage(null); setError(null); }} onApiKeyRequired={() => { setApiKeyPrompt("Enter your OpenAI API key to draft documentation."); setFocusApiKey(true); setActiveTab("chat"); }} />}
           </div>
         </div>
       ) : null}
@@ -430,7 +432,7 @@ export function BotPage({ botId, onOpenLibrary }: { botId: string; onOpenLibrary
 }
 
 function ChatPanel({
-  bot, botId, detail, activeConversationId, conversationError, onRetryConversation, conversationLoading, refreshingKnowledge, hasRefreshed, apiKey, onApiKeyChange, apiKeyPrompt, mode, onModeChange, message, onMessageChange, sending, processingMode, focusApiKey, onApiKeyFocused, onSubmit
+  bot, botId, detail, activeConversationId, conversationError, onRetryConversation, conversationLoading, refreshingKnowledge, hasRefreshed, apiKey, requiresApiKey, onApiKeyChange, apiKeyPrompt, mode, onModeChange, message, onMessageChange, sending, processingMode, focusApiKey, onApiKeyFocused, onSubmit
 }: {
   bot: Bot;
   botId: string;
@@ -442,6 +444,7 @@ function ChatPanel({
   refreshingKnowledge: boolean;
   hasRefreshed: boolean;
   apiKey: string;
+  requiresApiKey: boolean;
   onApiKeyChange: (value: string) => void;
   apiKeyPrompt: string;
   mode: BotMode;
@@ -476,7 +479,7 @@ function ChatPanel({
     setShowJumpToLatest(!atLatest);
   };
   const handleSubmit = (event: FormEvent) => {
-    if (message.trim() && activeConversationId && apiKey.trim() && !sending && !refreshingKnowledge) {
+    if (message.trim() && activeConversationId && (!requiresApiKey || apiKey.trim()) && !sending && !refreshingKnowledge) {
       scrollToLatest();
     }
     onSubmit(event);
@@ -522,14 +525,14 @@ function ChatPanel({
         {showJumpToLatest ? <button type="button" className="bot-jump-latest" onClick={() => scrollToLatest("smooth")}>Jump to latest</button> : null}
       </div>
       <form className={`bot-composer${refreshingKnowledge ? " is-disabled" : ""}`} onSubmit={handleSubmit}>
-        <label className="bot-key-field"><span><KeyRound size={13} /> OpenAI API key</span>
+        {requiresApiKey ? <label className="bot-key-field"><span><KeyRound size={13} /> OpenAI API key</span>
           <input ref={apiKeyInputRef} type="password" autoComplete="off" spellCheck={false} value={apiKey} onChange={(event) => onApiKeyChange(event.target.value)} placeholder="sk-…" aria-label="Your OpenAI API key" />
-        </label>
+        </label> : <p className="bot-data-note">Using the local Ollama model. No API key is needed.</p>}
         {apiKeyPrompt ? <p className="bot-key-prompt" role="status">{apiKeyPrompt}</p> : null}
-        <details className="bot-data-note"><summary>How your data is used</summary><p>Your OpenAI key stays in this page's memory and is sent with each AI request. It is separate from the Repo Brain owner token in Settings. Selected project excerpts are sent to OpenAI to answer.</p></details>
+        {requiresApiKey ? <details className="bot-data-note"><summary>How your data is used</summary><p>Your OpenAI key stays in this page's memory and is sent with each AI request. It is separate from the Repo Brain owner token in Settings. Selected project excerpts are sent to OpenAI to answer.</p></details> : null}
         <div className="bot-compose-row">
           <textarea aria-label="Message" value={message} onChange={(event) => onMessageChange(event.target.value)} placeholder={refreshingKnowledge ? "Chat will be available after refresh…" : mode === "teach" ? "What would you like to learn about?" : mode === "illustrate" ? "What should Najm explain with a static evidence map?" : "Ask this bot about the project…"} rows={3} disabled={refreshingKnowledge} />
-          <button type="submit" className="bots-primary-button bot-send-button" disabled={!apiKey.trim() || !message.trim() || !detail || sending || refreshingKnowledge} aria-label="Send message">
+          <button type="submit" className="bots-primary-button bot-send-button" disabled={(requiresApiKey && !apiKey.trim()) || !message.trim() || !detail || sending || refreshingKnowledge} aria-label="Send message">
             {sending ? <LoaderCircle size={16} className="bot-spinner" /> : <Send size={16} />}{sending ? "Sending" : "Send"}
           </button>
         </div>
@@ -635,7 +638,7 @@ function CopyBotLink({ botId }: { botId: string }) {
   return <button type="button" className="bot-copy-link" onClick={() => void copy()} title={url}>{copied ? <Check size={14} /> : <Clipboard size={14} />}{copied ? "Copied" : "Copy link"}</button>;
 }
 
-function ChangesPanel({ botId, apiKey, onApiKeyRequired }: { botId: string; apiKey: string; onApiKeyRequired: () => void }) {
+function ChangesPanel({ botId, apiKey, requiresApiKey, onApiKeyRequired }: { botId: string; apiKey: string; requiresApiKey: boolean; onApiKeyRequired: () => void }) {
   const [changes, setChanges] = useState<BotChange[]>([]);
   const [request, setRequest] = useState("");
   const [loading, setLoading] = useState(true);
@@ -655,14 +658,14 @@ function ChangesPanel({ botId, apiKey, onApiKeyRequired }: { botId: string; apiK
 
   const propose = async (event: FormEvent) => {
     event.preventDefault();
-    if (!apiKey.trim()) { setError("Enter your OpenAI API key in the conversation tab to request a code change."); onApiKeyRequired(); return; }
+    if (requiresApiKey && !apiKey.trim()) { setError("Enter your OpenAI API key in the conversation tab to request a code change."); onApiKeyRequired(); return; }
     if (!request.trim() || working) return;
     setWorking("propose"); setError(null); setNotice(null);
     const controller = new AbortController();
     operationAbortRef.current?.abort();
     operationAbortRef.current = controller;
     try {
-      const proposal = await proposeBotChange(botId, request.trim(), apiKey, controller.signal);
+      const proposal = await proposeBotChange(botId, request.trim(), requiresApiKey && apiKey.trim() ? apiKey : undefined, controller.signal);
       if (controller.signal.aborted) return;
       setChanges((current) => [proposal, ...current]);
       setRequest("");
@@ -713,7 +716,7 @@ function ChangeCard({ change, working, busy, onApply, onPublish }: { change: Bot
   </article>;
 }
 
-function DocumentationPanel({ botId, apiKey, autoDraft, onAutoDraftChange, onApiKeyRequired }: { botId: string; apiKey: string; autoDraft: boolean; onAutoDraftChange: (value: boolean) => void; onApiKeyRequired: () => void }) {
+function DocumentationPanel({ botId, apiKey, requiresApiKey, autoDraft, onAutoDraftChange, onApiKeyRequired }: { botId: string; apiKey: string; requiresApiKey: boolean; autoDraft: boolean; onAutoDraftChange: (value: boolean) => void; onApiKeyRequired: () => void }) {
   const [status, setStatus] = useState<BotDocumentationStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -745,13 +748,13 @@ function DocumentationPanel({ botId, apiKey, autoDraft, onAutoDraftChange, onApi
 
   const propose = async (event: FormEvent) => {
     event.preventDefault();
-    if (!apiKey.trim()) { onApiKeyRequired(); return; }
+    if (requiresApiKey && !apiKey.trim()) { onApiKeyRequired(); return; }
     setWorking(true); setError(null); setNotice(null);
     const controller = new AbortController();
     operationAbortRef.current?.abort();
     operationAbortRef.current = controller;
     try {
-      const result = await proposeBotDocumentation(botId, apiKey, documentationPaths, controller.signal);
+      const result = await proposeBotDocumentation(botId, requiresApiKey && apiKey.trim() ? apiKey : undefined, documentationPaths, controller.signal);
       if (controller.signal.aborted) return;
       setNotice(`Documentation proposal prepared (${result.status}). Review it under Code changes.`);
     } catch (proposalError) { if (!controller.signal.aborted) setError(proposalError instanceof Error ? proposalError.message : "Could not propose documentation."); }
@@ -764,7 +767,7 @@ function DocumentationPanel({ botId, apiKey, autoDraft, onAutoDraftChange, onApi
   return <section className="bot-tool-panel">
     <div className="bot-tool-title"><div><span className="bot-tool-context">Project knowledge</span><h2>Documentation</h2></div><div className="bot-tool-actions"><button className="bot-secondary-button" type="button" onClick={() => setLoadRevision((revision) => revision + 1)} disabled={loading || working}><RefreshCw size={13} />Refresh status</button><button className="bot-secondary-button" type="button" onClick={() => void check()} disabled={working}>{working ? "Checking…" : "Check for changes"}</button></div></div>
     <p>Check the repository for changes since its documentation was last recorded, or ask the bot to draft an update.</p>
-    <label className="bot-auto-draft"><input type="checkbox" checked={autoDraft} disabled={!apiKey.trim()} onChange={(event) => onAutoDraftChange(event.target.checked)} /><span><strong>Automatically draft documentation while this page is open</strong><small>Needs your OpenAI key in the Conversation tab. Checks every 60 seconds and prepares a reviewable draft only.</small></span></label>
+    <label className="bot-auto-draft"><input type="checkbox" checked={autoDraft} disabled={requiresApiKey && !apiKey.trim()} onChange={(event) => onAutoDraftChange(event.target.checked)} /><span><strong>Automatically draft documentation while this page is open</strong><small>{requiresApiKey ? "Needs your OpenAI key in the Conversation tab. Checks every 60 seconds and prepares a reviewable draft only." : "Uses the local Ollama model. Checks every 60 seconds and prepares a reviewable draft only."}</small></span></label>
     {loading ? <div className="bots-state">Loading documentation status…</div> : null}
     <div className="bot-doc-summary"><div><span>Recorded commit</span><strong>{status?.recorded_commit?.slice(0, 12) ?? "Not recorded"}</strong></div><div><span>Current commit</span><strong>{status?.current_commit?.slice(0, 12) ?? "Unavailable"}</strong></div><div><span>Last checked</span><strong>{status?.last_checked_at ? formatDate(status.last_checked_at) : "Never"}</strong></div></div>
     <div className="bot-doc-files"><strong>Changed files ({changedFiles.length})</strong>{changedFiles.length ? changedFiles.map((path) => <span key={path}><FileCode2 size={13} />{path}</span>) : <small>No changed files reported.</small>}</div>

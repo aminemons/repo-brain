@@ -5,6 +5,7 @@ import { createBot, getBots, refreshBotKnowledge, type Bot } from "../api/bots";
 import type { GitHubRepository } from "../api/github";
 import { createRepo } from "../api/repos";
 import { GitHubRepositoryPicker } from "../bots/GitHubRepositoryPicker";
+import { ModelSelector } from "../bots/ModelSelector";
 import type { RepoSummary } from "../api/types";
 import { useRepos } from "../hooks/useRepos";
 
@@ -22,7 +23,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
   const [repoDisplayName, setRepoDisplayName] = useState("");
   const [name, setName] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [model, setModel] = useState("gpt-5.5");
+  const [model, setModel] = useState("ollama/qwen2.5-coder:0.5b");
   const [creating, setCreating] = useState(false);
   const [stage, setStage] = useState<CreateStage>("idle");
   const [createError, setCreateError] = useState<string | null>(null);
@@ -232,7 +233,7 @@ export function BotsPage({ onOpenBot, onOpenRepos }: { onOpenBot: (botId: string
             </button>
             <label className="field"><span>Bot name</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Service guide" maxLength={120} required /></label>
             <label className="field"><span>Instructions <small>Optional</small></span><textarea value={instructions} onChange={(event) => setInstructions(event.target.value)} placeholder="Give the bot a focus, such as API behavior or onboarding." rows={3} maxLength={4000} /></label>
-            <label className="field"><span>OpenAI model ID</span><input value={model} onChange={(event) => setModel(event.target.value)} placeholder="gpt-5.5" required /><small className="field-help">Use a model ID available to your OpenAI key, such as gpt-5.5. Custom IDs are sent as entered.</small></label>
+            <ModelSelector model={model} onChange={setModel} />
             {reposError ? <div className="bots-message is-error" role="alert">{reposError}</div> : null}
             {createError ? <div className="bots-message is-error" role="alert">{createError}{createdBotId ? <button type="button" className="bot-text-link" onClick={() => onOpenBot(createdBotId)}>Open the created bot</button> : null}</div> : null}
             {createNotice ? <div className="bots-message" role="status"><RefreshCw size={14} className={creating ? "is-spinning" : undefined} />{stageText[stage] || createNotice}</div> : null}

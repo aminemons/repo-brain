@@ -135,7 +135,7 @@ export async function getBotConversation(
 export async function sendBotMessage(
   botId: string,
   conversationId: string,
-  payload: { message: string; mode: "explain" | "teach" | "illustrate"; api_key: string },
+  payload: { message: string; mode: "explain" | "teach" | "illustrate"; api_key?: string },
   signal?: AbortSignal
 ): Promise<BotMessage> {
   const response = await apiFetch(
@@ -200,14 +200,14 @@ export async function getBotChanges(botId: string, signal?: AbortSignal): Promis
 export async function proposeBotChange(
   botId: string,
   request: string,
-  apiKey: string,
+  apiKey: string | undefined,
   signal?: AbortSignal
 ): Promise<BotChange> {
   const response = await apiFetch(`${botsUrl}/${encodeURIComponent(botId)}/changes`, {
     method: "POST",
     signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ request, api_key: apiKey })
+    body: JSON.stringify({ request, ...(apiKey ? { api_key: apiKey } : {}) })
   });
   return readJson(response, "Change proposal");
 }
@@ -241,12 +241,12 @@ export async function checkBotDocumentation(botId: string, signal?: AbortSignal)
   return readJson(response, "Documentation check");
 }
 
-export async function proposeBotDocumentation(botId: string, apiKey: string, paths?: string[], signal?: AbortSignal): Promise<BotChange> {
+export async function proposeBotDocumentation(botId: string, apiKey: string | undefined, paths?: string[], signal?: AbortSignal): Promise<BotChange> {
   const response = await apiFetch(`${botsUrl}/${encodeURIComponent(botId)}/documentation/propose`, {
     method: "POST",
     signal,
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ api_key: apiKey, ...(paths?.length ? { paths } : {}) })
+    body: JSON.stringify({ ...(apiKey ? { api_key: apiKey } : {}), ...(paths?.length ? { paths } : {}) })
   });
   return readJson(response, "Documentation proposal");
 }
