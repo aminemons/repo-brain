@@ -5,6 +5,7 @@ from backend.app.database import get_store
 from backend.app.schemas.ask import AskRequest, AskResponse
 from backend.app.services.graphrag import GraphRAGRetriever
 from backend.app.services.llm.gateway import LLMGateway
+from backend.app.services.llm.model_router import ModelRouter
 from backend.app.services.llm.run_recorder import LLMCallError
 from backend.app.services.question_answerer import QuestionAnswerer
 
@@ -15,6 +16,13 @@ router = APIRouter()
 async def ask_repo(repo_id: str, payload: AskRequest) -> AskResponse:
     settings = get_settings()
     store = get_store()
+    if store.get_repo(repo_id) is None:
+        raise HTTPException(status_code=404, detail="Repository not found")
+    if ModelRouter(settings).profile_for("qa").model == "provider/strong-coding-model":
+        raise HTTPException(
+            status_code=400,
+            detail="Use this repository's bot with your OpenAI key, or configure an Ask model on the server.",
+        )
     answerer = QuestionAnswerer(
         GraphRAGRetriever(store=store, settings=settings),
         LLMGateway(settings),

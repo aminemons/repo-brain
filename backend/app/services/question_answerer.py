@@ -3,7 +3,8 @@ from hashlib import sha256
 
 from backend.app.database import CodeWikiStore
 from backend.app.schemas.ask import AskRequest, AskResponse, SourceRef
-from backend.app.services.async_tasks import run_blocking
+from backend.app.services.analyzer import AnalysisService
+from backend.app.services.async_tasks import repo_write_lock, run_blocking
 from backend.app.services.graphrag import GraphRAGRetriever
 from backend.app.services.llm.gateway import LLMGateway
 from backend.app.services.llm.messages import dynamic_json_message, stable_json_message
@@ -42,11 +43,17 @@ class QuestionAnswerer:
         if request.mode != "graph_rag":
             raise ValueError(f"Unsupported ask mode: {request.mode}")
 
-        trace = await self.retriever.retrieve(
-            repo_id,
-            request.question,
-            max_hops=request.max_hops,
-        )
+        async with repo_write_lock(repo_id):
+            analysis = await run_blocking(AnalysisService(store=self.store).analyze, repo_id)
+            if analysis.status != "done":
+                raise ValueError("Repository analysis did not complete. Retry the question.")
+            if analysis.mode != "unchanged":
+                await self.retriever.build_index(repo_id, include_embeddings=False)
+            trace = await self.retriever.retrieve(
+                repo_id,
+                request.question,
+                max_hops=request.max_hops,
+            )
         related_nodes = [*trace.seed_nodes, *trace.expanded_nodes] if request.include_graph else []
         related_edges = trace.related_edges if request.include_graph else []
         related_communities = trace.community_summaries if request.include_graph else []
